@@ -54,22 +54,6 @@ right-click → Open shortcut no longer works for un-notarised apps; Privacy &
 Security is the way. Windows shows the equivalent SmartScreen prompt — choose
 **More info → Run anyway**.
 
-### Make it your default Markdown reader
-
-DareDown claims six extensions, and Finder's "Change All…" only does one at a
-time, so [`duti`](https://github.com/moretension/duti) is worth it:
-
-```bash
-brew install duti
-```
-
-```bash
-for ext in md markdown mdown mkd mdx qmd; do duti -s com.borduhh.daredown "$ext" all; done
-```
-
-Without `duti`: right-click any `.md` → **Get Info** → **Open with:** → DareDown →
-**Change All…**
-
 ### From source
 
 ```bash
