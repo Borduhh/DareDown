@@ -21,6 +21,53 @@ The visual target is a printed page under a lamp rather than a code editor: one
 warm surface, a measured column, hairline rules, and no shadows anywhere except
 the diagram modal.
 
+## Install
+
+Grab an installer from the [latest release](https://github.com/Borduhh/DareDown/releases/latest):
+
+| Platform | Download |
+|---|---|
+| macOS (Apple silicon) | `DareDown-*-arm64.dmg` |
+| macOS (Intel) | `DareDown-*.dmg` |
+| Windows | `DareDown.Setup.*.exe`, or `DareDown.*.exe` to run without installing |
+| Linux | `DareDown-*.AppImage`, or `daredown_*_amd64.deb` |
+
+### macOS blocks it on first launch
+
+DareDown is signed, but not **notarised** — that needs a paid Apple Developer
+account. So the first time you open it, macOS refuses and says it cannot verify
+the developer. To get past it, once:
+
+1. Double-click DareDown and dismiss the warning. This step matters — the button
+   in the next step only appears after macOS has blocked a launch attempt.
+2. Open **System Settings → Privacy & Security**.
+3. Scroll to the Security section, find the message about DareDown being blocked,
+   and click **Open Anyway**.
+4. Confirm with Touch ID or your password.
+
+It opens normally from then on. On macOS 15 and later the old
+right-click → Open shortcut no longer works for un-notarised apps; Privacy &
+Security is the way. Windows shows the equivalent SmartScreen prompt — choose
+**More info → Run anyway**.
+
+### Make it your default Markdown reader
+
+DareDown claims six extensions, and Finder's "Change All…" only does one at a
+time, so [`duti`](https://github.com/moretension/duti) is worth it:
+
+```bash
+brew install duti
+```
+
+```bash
+for ext in md markdown mdown mkd mdx qmd; do duti -s com.borduhh.daredown "$ext" all; done
+```
+
+Without `duti`: right-click any `.md` → **Get Info** → **Open with:** → DareDown →
+**Change All…**
+
+### From source
+
 ```bash
 git clone https://github.com/Borduhh/DareDown.git
 cd DareDown
@@ -89,20 +136,20 @@ No telemetry, no accounts, no cloud sync. The renderer is sandboxed with
 
 `⌘/` (`Ctrl+/`) lists them all in the app. The essentials:
 
-| | |
-|---|---|
-| `⌘O` / `⇧⌘O` | Open file / folder |
-| `⌘P` | Quick open |
-| `⌘B` | Show / hide sidebar |
-| `⇧⌘B` | Switch sidebar view (files ⇄ outline) |
-| `⇧⌘E` / `⇧⌘Y` | Files / Outline directly |
-| `⌘\` | Full width |
-| `⌘[` `⌘]` | Narrower / wider column |
-| `⇧⌘T` | Light / dark theme |
-| `⌘F`, `⌘G` | Find in document, find next |
-| `⌘+` `⌘-` `⌘0` | Text size |
-| `⌘R` | Reload document |
-| `⌘1`–`⌘9` | Jump to tab |
+| Area | Shortcut | Action |
+|---|---|---|
+| Files | `⌘O` / `⇧⌘O` | Open file / folder |
+| Files | `⌘P` | Quick open |
+| Files | `⌘R` | Reload document |
+| Sidebar | `⌘B` | Show / hide sidebar |
+| Sidebar | `⇧⌘B` | Switch view, files ⇄ outline |
+| Sidebar | `⇧⌘E` / `⇧⌘Y` | Files / Outline directly |
+| Reading | `⌘\` | Full width |
+| Reading | `⌘[` `⌘]` | Narrower / wider column |
+| Reading | `⌘+` `⌘-` `⌘0` | Text size |
+| Reading | `⇧⌘T` | Light / dark theme |
+| Navigate | `⌘F` / `⌘G` | Find in document / find next |
+| Navigate | `⌘1`–`⌘9` | Jump to tab |
 
 Inside a diagram: click to open fullscreen, drag to pan, scroll or pinch to zoom,
 double-click to zoom at the pointer, `+`/`-`/`0` and arrows, `Esc` to close.
@@ -193,12 +240,12 @@ Versions are derived from commit messages by
 
 Write [Conventional Commits](https://www.conventionalcommits.org/):
 
-| Commit | Effect | Example |
-|---|---|---|
-| `fix:` `perf:` `refactor:` `style:` `revert:` | patch | `0.3.0` → `0.3.1` |
-| `feat:` | minor | `0.3.0` → `0.4.0` |
-| `feat!:` or a `BREAKING CHANGE:` footer | major | `0.3.0` → `1.0.0` |
-| `docs:` `test:` `build:` `ci:` `chore:` | no release | — |
+| Commit type | Release | Version | Example |
+|---|---|---|---|
+| `fix:` `perf:` `refactor:` `style:` `revert:` | patch | `1.0.1` → `1.0.2` | `fix(outline): clamp scroll offset` |
+| `feat:` | minor | `1.0.1` → `1.1.0` | `feat(mermaid): support radar charts` |
+| `feat!:` or a `BREAKING CHANGE:` footer | major | `1.0.1` → `2.0.0` | `feat(prefs)!: drop legacy config keys` |
+| `docs:` `test:` `build:` `ci:` `chore:` | none | — | `docs: fix a typo` |
 
 Scopes are conventional but optional: `feat(mermaid): …`, `fix(outline): …`. The
 allowed list is in `commitlint.config.js`, and CI warns rather than fails on an
