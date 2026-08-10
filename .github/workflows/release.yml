@@ -1,0 +1,116 @@
+name: Release
+
+on:
+  push:
+    branches: [main, next]
+  workflow_dispatch:
+
+# Two release runs at once would race on tags and the changelog.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Version from commits
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the release commit and tag
+      issues: write # semantic-release opens an issue if a release fails
+      pull-requests: write
+    outputs:
+      published: ${{ steps.result.outputs.published }}
+      version: ${{ steps.result.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # semantic-release reads the whole history and every tag to work out
+          # what changed since the last release.
+          fetch-depth: 0
+          persist-credentials: true
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release
+
+      - name: Report what was released
+        id: result
+        shell: bash
+        run: |
+          # .released-version is written by the exec plugin during publish, so it
+          # exists only when a release actually happened.
+          if [ -f .released-version ]; then
+            version="$(cat .released-version)"
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "version=$version" >> "$GITHUB_OUTPUT"
+            echo "Released v$version" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "No release: nothing since the last tag warrants a version bump." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  build:
+    name: Build ${{ matrix.label }}
+    needs: version
+    if: needs.version.outputs.published == 'true'
+    permissions:
+      contents: write # upload installers to the release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            label: macOS
+            script: dist:mac
+          - os: windows-latest
+            label: Windows
+            script: dist:win
+          - os: ubuntu-latest
+            label: Linux
+            script: dist:linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      # Check out the tag semantic-release just made, so package.json carries
+      # the new version and the installers are stamped with it.
+      - uses: actions/checkout@v5
+        with:
+          ref: v${{ needs.version.outputs.version }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Package
+        env:
+          # Unsigned builds: without this, electron-builder hunts for a keychain
+          # identity and fails the job on macOS runners.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npm run ${{ matrix.script }}
+
+      - name: Attach installers to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(release/*.dmg release/*.zip release/*.exe release/*.AppImage release/*.deb release/latest*.yml)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No installers were produced for ${{ matrix.label }}." >&2
+            exit 1
+          fi
+          printf 'Uploading %s\n' "${files[@]}"
+          gh release upload "v${{ needs.version.outputs.version }}" "${files[@]}" --clobber

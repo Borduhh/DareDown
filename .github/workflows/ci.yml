@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, next]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Build and check commits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The version number is derived from these messages, so an unparseable
+      # commit is a real problem — catch it before it reaches main.
+      - name: Lint commit messages
+        if: github.event_name == 'pull_request'
+        run: >
+          npx commitlint
+          --from ${{ github.event.pull_request.base.sha }}
+          --to ${{ github.event.pull_request.head.sha }}
+          --verbose
+
+      # Also asserts that mermaid's lazily-imported diagram modules got inlined;
+      # scripts/build.mjs fails the build if any dynamic import() survives.
+      - name: Build renderer
+        run: npm run build
+
+      # A full `semantic-release --dry-run` cannot run here: on a pull request the
+      # ref is `NN/merge`, which is not a release branch. Check what is checkable
+      # — that the config parses and every plugin it names is actually installed.
+      - name: Check the release config
+        run: |
+          node -e "
+            const fs = require('node:fs');
+            const path = require('node:path');
+            const cfg = JSON.parse(fs.readFileSync('.releaserc.json', 'utf8'));
+            const names = cfg.plugins.map((p) => (Array.isArray(p) ? p[0] : p));
+            const missing = names.filter(
+              (n) => !fs.existsSync(path.join('node_modules', n, 'package.json'))
+            );
+            if (missing.length) {
+              throw new Error('plugins named in .releaserc.json but not installed: ' + missing.join(', '));
+            }
+            const presets = cfg.plugins
+              .filter((p) => Array.isArray(p) && p[1] && p[1].preset)
+              .map((p) => 'conventional-changelog-' + p[1].preset);
+            const missingPresets = [...new Set(presets)].filter(
+              (n) => !fs.existsSync(path.join('node_modules', n, 'package.json'))
+            );
+            if (missingPresets.length) {
+              throw new Error('changelog presets missing: ' + missingPresets.join(', '));
+            }
+            console.log('release config OK — ' + names.length + ' plugins, ' + new Set(presets).size + ' preset(s) present');
+          "
