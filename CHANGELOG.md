@@ -3,6 +3,12 @@
 Every release on this page is derived from commit messages by semantic-release.
 Do not edit it by hand.
 
+## [1.0.3](https://github.com/Borduhh/DareDown/compare/v1.0.2...v1.0.3) (2026-08-10)
+
+### Bug Fixes
+
+* **packaging:** give small icon sizes their own art and key the background ([0aaa1e4](https://github.com/Borduhh/DareDown/commit/0aaa1e4d6079dd87965c2ade93602e11169c23d7))
+
 ## [1.0.2](https://github.com/Borduhh/DareDown/compare/v1.0.1...v1.0.2) (2026-08-10)
 
 ### Interface & Styling
