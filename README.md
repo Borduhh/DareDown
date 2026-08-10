@@ -1,17 +1,21 @@
-<img src="build/icon.png" alt="DareDown" width="112" align="right" />
+<div align="center">
+
+<img src="build/icon.png" alt="" width="124" />
 
 # DareDown
 
 **A markdown reader that isn't afraid of anything — not even your gnarliest .md files.**
 
+[![Platforms](https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-2C2A26?style=flat-square)](https://github.com/Borduhh/DareDown/releases)
+[![Offline](https://img.shields.io/badge/offline-no%20network%20calls-4F7245?style=flat-square)](#offline-and-read-only-enforced)
+[![License](https://img.shields.io/badge/license-MIT-6B6862?style=flat-square)](LICENSE)
+
+</div>
+
 > **DareDown cost a *lot* of tokens to build.** If it earns a spot in your dock,
 > a sponsorship keeps it getting updates.
 >
 > [![Sponsor DareDown](https://img.shields.io/badge/Sponsor-DareDown-B5602F?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/Borduhh)
-
-[![Platforms](https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-2C2A26?style=flat-square)](https://github.com/Borduhh/DareDown/releases)
-[![Offline](https://img.shields.io/badge/offline-no%20network%20calls-4F7245?style=flat-square)](#offline-and-read-only-enforced)
-[![License](https://img.shields.io/badge/license-MIT-6B6862?style=flat-square)](LICENSE)
 
 A quiet, offline desktop reader for local Markdown. View-only by design — it renders
 GFM and Mermaid diagrams and stays out of the way. Electron, so it behaves identically
@@ -189,6 +193,7 @@ src/renderer/
 build/icon.png      the app icon, source asset for .icns and .ico
 scripts/build.mjs   esbuild bundle + harness generator
 scripts/check-icon.mjs  refuses to package without a usable icon
+scripts/after-pack.mjs  ad-hoc signs macOS builds when no Developer ID is present
 .releaserc.json     semantic-release: how commits map to versions
 commitlint.config.js  commit-message rules enforced on pull requests
 .github/workflows/  ci.yml (build + commit lint), release.yml (version + installers)
@@ -219,9 +224,14 @@ npm run pack          # unpacked directory, for a quick check
 ```
 
 Output lands in `release/`. `.md` and friends are registered as openable document
-types on all three platforms. Builds are unsigned unless a signing identity is
-available — on macOS, set up a Developer ID and electron-builder will pick it up;
-without one, `release/` artifacts will warn on first launch on another machine.
+types on all three platforms.
+
+macOS builds are **ad-hoc signed, not notarised**. With no Developer ID on the
+machine, electron-builder skips signing entirely and leaves Electron's own
+signature on the renamed binary, which macOS rejects outright as damaged;
+`scripts/after-pack.mjs` re-signs ad-hoc so you get the ordinary
+unidentified-developer prompt instead. Set `CSC_LINK` and `CSC_KEY_PASSWORD` and
+it steps aside so a real identity is used.
 
 The app icon is a committed source asset at **`build/icon.png`** — a square PNG,
 1024×1024, from which electron-builder generates the macOS `.icns` and Windows
@@ -268,22 +278,6 @@ instead. To see what *would* happen without touching anything:
 ```bash
 npm run release:dry
 ```
-
-### First release
-
-The first push to `main` releases **1.0.0** — semantic-release's default when the
-repository has no tags yet, and deliberate here. Don't tag a `v0.1.0` baseline
-first; that would start the numbering in `0.x` instead. Everything after that is
-derived from the table above.
-
-### A pin worth keeping
-
-`conventional-changelog-conventionalcommits` is pinned to `^8`. Version 10 targets
-a newer `conventional-changelog-writer` than `@semantic-release/release-notes-generator@14`
-depends on, and the mismatch fails *silently* — versions still come out correct,
-but every release gets empty notes and an empty changelog entry. Upgrade it only
-together with the semantic-release plugins, and check that `npm run release:dry`
-still prints a populated notes block.
 
 ## Known limits
 
