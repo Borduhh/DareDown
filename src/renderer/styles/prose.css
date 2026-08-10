@@ -405,35 +405,79 @@
 .prose .table-wrap {
   margin: 1.5em 0;
   overflow-x: auto;
-  border: var(--hairline) solid var(--border);
-  border-radius: var(--radius-sm);
+  /* A softer corner than the rest of the page furniture: a table is a panel,
+     and the tighter --radius-sm read as a clipped rectangle at this size.
+     The frame comes from the table's own background, so no border here — one
+     would double up with the outer gap below. */
+  border-radius: var(--radius);
 }
+
+/*
+ * Separation by fill, not by rule.
+ *
+ * Each cell is a tinted tile and the gaps between them are left transparent, so
+ * the page shows through as light hairlines. Note the direction: the tint is on
+ * the cells, not behind them — painting the table darker and letting it show
+ * through the gaps gives dark lines between pale cells, which is a ruled grid
+ * wearing a different mechanism. This reads as blocks.
+ *
+ * Transparent gaps also mean a table nested in a callout picks up the callout's
+ * ground for free, rather than punching page-coloured lines through it.
+ */
 .prose table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 2px;
+  background: transparent;
   font-size: 0.92em;
   font-variant-numeric: tabular-nums;
 }
+/* A full hairline grid: column dividers as well as row rules, so dense tables
+   stay readable across many columns instead of running together. */
 .prose th,
 .prose td {
-  padding: 0.5em 0.85em;
-  border-bottom: var(--hairline) solid var(--border);
+  padding: 0.68em 1em;
+  border: 0;
+  background: var(--bg-sidebar);
   text-align: left;
   vertical-align: top;
 }
+/* A plain label, not a small-caps eyebrow: tracking and extra weight make a
+   header row shout. One step deeper than the body tiles is enough, with the
+   weight carrying the rest. */
 .prose thead th {
-  background: var(--bg-sidebar);
-  color: var(--text-2);
-  font-size: 0.92em;
-  font-weight: 650;
-  letter-spacing: 0.025em;
+  background: var(--bg-code);
+  color: var(--text);
+  font-size: 0.95em;
+  font-weight: 600;
+  letter-spacing: 0;
   white-space: nowrap;
 }
-.prose tbody tr:last-child td {
-  border-bottom: 0;
-}
+/* Mixed against the tile, not the page, so the tint lands on the right ground. */
 .prose tbody tr:hover td {
-  background: var(--accent-soft);
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-sidebar));
+}
+
+/*
+ * Inside a table the code chip inverts: lighter than its tile rather than
+ * darker than the page, and with no border. A bordered box on top of a tinted
+ * tile is two frames deep, but dropping the chip entirely would run adjacent
+ * spans together — `fix:` `perf:` in one cell. Going lighter keeps them
+ * separable with one less line on screen.
+ *
+ * Scoped through .table-wrap rather than `td`: the chip rule is
+ * `.prose :not(pre) > code`, and code.css loads after this file, so an override
+ * needs a second class to win on specificity rather than order. Matching on the
+ * cell alone would also miss the common case — `:not(pre) > code` needs the
+ * code's parent, which here *is* the cell, not something inside it.
+ */
+.prose .table-wrap code {
+  padding: 0.1em 0.34em;
+  border: 0;
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.9em;
 }
 .prose td[align="right"],
 .prose th[align="right"] {
