@@ -1,0 +1,243 @@
+/*
+ * Code blocks and a custom highlight.js theme.
+ *
+ * The stock highlight.js themes are built for editors — saturated, high
+ * contrast, many hues. This one uses a narrow warm palette and leans on weight
+ * and muting rather than colour, so a fenced block sits quietly in the page.
+ */
+
+.prose code,
+.prose kbd,
+.prose samp {
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+}
+
+/* Inline code */
+.prose :not(pre) > code {
+  padding: 0.13em 0.36em;
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-code);
+  color: var(--text);
+  font-size: 0.855em;
+  overflow-wrap: break-word;
+}
+.prose a > code {
+  color: var(--accent);
+}
+
+/* --- fenced block chrome ---------------------------------------------- */
+
+.code-block {
+  position: relative;
+  margin: 1.5em 0;
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-code);
+  overflow: hidden;
+}
+
+.code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 27px;
+  padding: 0 5px 0 11px;
+  border-bottom: var(--hairline) solid var(--border);
+  color: var(--text-3);
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+  user-select: none;
+}
+.code-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.code-copy {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+.code-block:hover .code-copy,
+.code-copy:focus-visible {
+  opacity: 1;
+}
+.code-copy:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+.code-copy.is-done {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 13px 15px;
+  overflow-x: auto;
+  font-size: 0.845em;
+  line-height: 1.58;
+  tab-size: 2;
+}
+.code-block code {
+  display: block;
+  min-width: 0;
+  font-family: var(--font-mono);
+  color: var(--text);
+  white-space: pre;
+}
+
+/* Soft-wrap toggle, driven by the reading preference. */
+.app[data-wrap-code="true"] .code-block pre {
+  overflow-x: hidden;
+}
+.app[data-wrap-code="true"] .code-block code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* --- highlight.js tokens ---------------------------------------------- */
+
+[data-theme="light"] {
+  --hl-comment: #948e80;
+  --hl-keyword: #96593b;
+  --hl-string: #5b7250;
+  --hl-number: #8a6a2b;
+  --hl-literal: #8a6a2b;
+  --hl-type: #4a6a86;
+  --hl-func: #3f6b8f;
+  --hl-var: #2c2a26;
+  --hl-attr: #6d5a91;
+  --hl-meta: #948e80;
+  --hl-deleted: #a3452f;
+  --hl-added: #4f7245;
+}
+[data-theme="dark"] {
+  --hl-comment: #7a766c;
+  --hl-keyword: #d99b72;
+  --hl-string: #a3bb92;
+  --hl-number: #d7b177;
+  --hl-literal: #d7b177;
+  --hl-type: #9dc0da;
+  --hl-func: #8fb6d4;
+  --hl-var: #edeae3;
+  --hl-attr: #bda8e0;
+  --hl-meta: #7a766c;
+  --hl-deleted: #dd8a72;
+  --hl-added: #8fb082;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: var(--hl-comment);
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-doctag,
+.hljs-name,
+.hljs-tag {
+  color: var(--hl-keyword);
+  font-weight: 550;
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-char.escape_,
+.hljs-subst,
+.hljs-template-tag,
+.hljs-template-variable {
+  color: var(--hl-string);
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-bullet {
+  color: var(--hl-number);
+}
+
+.hljs-type,
+.hljs-class .hljs-title,
+.hljs-title.class_,
+.hljs-title.class_.inherited__,
+.hljs-built_in,
+.hljs-builtin-name {
+  color: var(--hl-type);
+}
+
+.hljs-function .hljs-title,
+.hljs-title,
+.hljs-title.function_,
+.hljs-section {
+  color: var(--hl-func);
+  font-weight: 550;
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-property,
+.hljs-selector-attr,
+.hljs-selector-class,
+.hljs-selector-id,
+.hljs-selector-pseudo {
+  color: var(--hl-attr);
+}
+
+.hljs-variable,
+.hljs-params,
+.hljs-operator,
+.hljs-punctuation {
+  color: var(--hl-var);
+}
+
+.hljs-meta,
+.hljs-meta .hljs-keyword,
+.hljs-meta .hljs-string,
+.hljs-comment.hljs-doctag {
+  color: var(--hl-meta);
+}
+
+.hljs-addition {
+  color: var(--hl-added);
+}
+.hljs-deletion {
+  color: var(--hl-deleted);
+}
+
+.hljs-link {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 700;
+}
+/* Anything highlight.js marks as unparseable stays plain rather than red. */
+.hljs-formula,
+.hljs-code {
+  color: inherit;
+}

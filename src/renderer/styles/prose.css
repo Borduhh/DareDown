@@ -1,0 +1,536 @@
+/*
+ * Reading typography. One measured column, generous margins, restrained
+ * hierarchy. Sizes are relative to --font-size so the text-size preference
+ * scales the whole page coherently instead of just the body copy.
+ */
+
+.prose {
+  max-width: var(--reading-width);
+  margin: 0 auto;
+  padding: 62px var(--gutter) 42vh;
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+  color: var(--text);
+  font-variant-numeric: proportional-nums;
+  /* Selectable text inside an otherwise chrome-like app. */
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/*
+ * Full width: let the column fill the pane instead of holding a measure. Wide
+ * tables and diagrams are the point, so the side padding scales with the window
+ * rather than staying at the reading gutter.
+ */
+.app[data-full-width="true"] .prose {
+  max-width: none;
+  padding-left: clamp(24px, 4.5vw, 92px);
+  padding-right: clamp(24px, 4.5vw, 92px);
+}
+
+@media (max-width: 720px) {
+  .prose {
+    padding-left: 22px;
+    padding-right: 22px;
+  }
+}
+
+.prose > *:first-child {
+  margin-top: 0;
+}
+
+/* --- front matter ------------------------------------------------------ */
+
+.doc-frontmatter {
+  margin: 0 0 30px;
+  padding-bottom: 16px;
+  border-bottom: var(--hairline) solid var(--border);
+  color: var(--text-2);
+  font-size: 0.82em;
+  line-height: 1.6;
+}
+.doc-frontmatter dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 14px;
+  margin: 0;
+}
+.doc-frontmatter dt {
+  color: var(--text-3);
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.05em;
+}
+.doc-frontmatter dd {
+  margin: 0;
+  color: var(--text-2);
+}
+
+/* --- headings ---------------------------------------------------------- */
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  position: relative;
+  margin: 1.9em 0 0.6em;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.011em;
+  scroll-margin-top: 26px;
+}
+.prose h1 {
+  margin-top: 0.2em;
+  font-size: 1.72em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.prose h2 {
+  margin-top: 2.1em;
+  padding-bottom: 0.28em;
+  border-bottom: var(--hairline) solid var(--border);
+  font-size: 1.34em;
+}
+.prose h3 {
+  font-size: 1.13em;
+}
+.prose h4 {
+  font-size: 1em;
+}
+.prose h5,
+.prose h6 {
+  font-size: 0.9em;
+  color: var(--text-2);
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.055em;
+}
+
+/* Hover-revealed anchor in the left margin — invisible until wanted. */
+.prose .heading-anchor {
+  position: absolute;
+  left: -0.85em;
+  top: 0;
+  width: 0.85em;
+  color: var(--text-3);
+  font-weight: 400;
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+.prose h1:hover .heading-anchor,
+.prose h2:hover .heading-anchor,
+.prose h3:hover .heading-anchor,
+.prose h4:hover .heading-anchor,
+.prose h5:hover .heading-anchor,
+.prose h6:hover .heading-anchor {
+  opacity: 1;
+}
+.prose .heading-anchor:hover {
+  color: var(--accent);
+}
+
+/* Brief tint when arriving at a heading via a link. */
+.prose :target {
+  animation: target-glow 1.4s var(--ease);
+}
+@keyframes target-glow {
+  0%,
+  55% {
+    background: var(--accent-soft);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+/* --- body -------------------------------------------------------------- */
+
+.prose p {
+  margin: 0 0 1.05em;
+}
+
+.prose a {
+  color: var(--accent);
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  text-decoration-color: var(--accent-line);
+  cursor: pointer;
+  overflow-wrap: break-word;
+}
+.prose a:hover {
+  text-decoration-color: var(--accent);
+}
+/* External links get a small outward arrow so a click's cost is legible. */
+.prose a[data-link="external"]::after {
+  content: "↗";
+  display: inline-block;
+  margin-left: 0.15em;
+  font-size: 0.78em;
+  vertical-align: 0.12em;
+  opacity: 0.7;
+  text-decoration: none;
+}
+.prose a[data-link="missing"] {
+  color: var(--text-2);
+  text-decoration-style: dotted;
+  cursor: help;
+}
+
+.prose strong {
+  font-weight: 650;
+}
+.prose em {
+  font-style: italic;
+}
+.prose s,
+.prose del {
+  color: var(--text-2);
+  text-decoration-thickness: 1px;
+}
+.prose mark {
+  background: var(--accent-soft);
+  color: inherit;
+  padding: 0.05em 0.15em;
+  border-radius: 2px;
+}
+.prose abbr {
+  text-decoration: underline dotted var(--text-3);
+}
+.prose kbd {
+  padding: 0.1em 0.42em;
+  border: var(--hairline) solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+}
+
+/* --- lists ------------------------------------------------------------- */
+
+.prose ul,
+.prose ol {
+  margin: 0 0 1.05em;
+  padding-left: 1.45em;
+}
+.prose li {
+  margin: 0.24em 0;
+}
+.prose li > ul,
+.prose li > ol {
+  margin: 0.24em 0 0.35em;
+}
+.prose ul {
+  list-style: none;
+}
+/* Small warm bullet rather than the browser's heavy disc. */
+.prose ul > li::before {
+  content: "";
+  position: absolute;
+  margin-left: -1.05em;
+  margin-top: 0.62em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+.prose ul > li {
+  position: relative;
+}
+.prose ul ul > li::before {
+  background: transparent;
+  border: 1px solid var(--text-3);
+}
+.prose ol {
+  list-style: decimal;
+}
+.prose ol > li::marker {
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* GFM task lists — rendered read-only. */
+.prose li.task-list-item {
+  list-style: none;
+  padding-left: 0.15em;
+}
+.prose li.task-list-item::before {
+  display: none;
+}
+.prose .task-list-item-checkbox {
+  appearance: none;
+  width: 0.86em;
+  height: 0.86em;
+  margin: 0 0.5em 0 -1.5em;
+  border: 1.4px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--bg-raised);
+  vertical-align: -0.08em;
+  cursor: default;
+}
+.prose .task-list-item-checkbox:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.prose .task-list-item-checkbox:checked::after {
+  content: "";
+  display: block;
+  width: 0.28em;
+  height: 0.52em;
+  margin: 0.03em 0 0 0.22em;
+  border: 1.6px solid var(--bg);
+  border-top: 0;
+  border-left: 0;
+  transform: rotate(41deg);
+}
+.prose li.task-list-item:has(> .task-list-item-checkbox:checked) {
+  color: var(--text-2);
+}
+
+/* --- quotes ------------------------------------------------------------ */
+
+.prose blockquote {
+  margin: 1.5em 0;
+  padding: 0.1em 0 0.1em 1.15em;
+  border-left: 2px solid var(--border-strong);
+  color: var(--text-2);
+  font-style: italic;
+}
+.prose blockquote p:last-child {
+  margin-bottom: 0;
+}
+.prose blockquote cite {
+  display: block;
+  margin-top: 0.5em;
+  font-style: normal;
+  font-size: 0.86em;
+  color: var(--text-3);
+}
+
+/* GitHub-style alerts (> [!NOTE] etc.) */
+.prose .callout {
+  margin: 1.5em 0;
+  padding: 0.85em 1.1em;
+  border: var(--hairline) solid var(--border);
+  border-left: 2.5px solid var(--callout-hue, var(--text-3));
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text);
+  font-style: normal;
+}
+.prose .callout > :last-child {
+  margin-bottom: 0;
+}
+.prose .callout-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  margin-bottom: 0.35em;
+  color: var(--callout-hue, var(--text-2));
+  font-size: 0.85em;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.prose .callout[data-kind="note"] {
+  --callout-hue: var(--hue-blue);
+}
+.prose .callout[data-kind="tip"] {
+  --callout-hue: var(--hue-green);
+}
+.prose .callout[data-kind="important"] {
+  --callout-hue: var(--hue-violet);
+}
+.prose .callout[data-kind="warning"] {
+  --callout-hue: var(--hue-amber);
+}
+.prose .callout[data-kind="caution"] {
+  --callout-hue: var(--hue-red);
+}
+
+/* --- rules, images, tables -------------------------------------------- */
+
+.prose hr {
+  height: 0;
+  margin: 2.6em 0;
+  border: 0;
+  border-top: var(--hairline) solid var(--border);
+}
+/* A centred glyph reads more like a printed section break. */
+.prose hr::after {
+  content: "❧";
+  display: block;
+  width: 2em;
+  margin: -0.75em auto 0;
+  background: var(--bg);
+  color: var(--text-3);
+  font-size: 0.8em;
+  text-align: center;
+  opacity: 0.65;
+}
+
+.prose img,
+.prose video {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.5em auto;
+  border-radius: var(--radius-sm);
+}
+.prose img.is-inline {
+  display: inline-block;
+  margin: 0 0.1em;
+  vertical-align: text-bottom;
+}
+.prose img.is-missing {
+  min-width: 120px;
+  min-height: 44px;
+  padding: 12px;
+  border: var(--hairline) dashed var(--border-strong);
+  background: var(--bg-code);
+}
+.prose figure {
+  margin: 1.6em 0;
+}
+.prose figcaption {
+  margin-top: 0.55em;
+  color: var(--text-2);
+  font-size: 0.85em;
+  text-align: center;
+}
+
+/* Tables can exceed the reading column, so they scroll inside their own box. */
+.prose .table-wrap {
+  margin: 1.5em 0;
+  overflow-x: auto;
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92em;
+  font-variant-numeric: tabular-nums;
+}
+.prose th,
+.prose td {
+  padding: 0.5em 0.85em;
+  border-bottom: var(--hairline) solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+.prose thead th {
+  background: var(--bg-sidebar);
+  color: var(--text-2);
+  font-size: 0.92em;
+  font-weight: 650;
+  letter-spacing: 0.025em;
+  white-space: nowrap;
+}
+.prose tbody tr:last-child td {
+  border-bottom: 0;
+}
+.prose tbody tr:hover td {
+  background: var(--accent-soft);
+}
+.prose td[align="right"],
+.prose th[align="right"] {
+  text-align: right;
+}
+.prose td[align="center"],
+.prose th[align="center"] {
+  text-align: center;
+}
+
+/* --- collapsible details ---------------------------------------------- */
+
+.prose details {
+  margin: 1.4em 0;
+  padding: 0.7em 1em;
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+}
+.prose details > summary {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 550;
+  list-style: none;
+}
+.prose details > summary::-webkit-details-marker {
+  display: none;
+}
+.prose details > summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 1.1em;
+  color: var(--text-3);
+  transition: transform var(--dur) var(--ease);
+}
+.prose details[open] > summary::before {
+  transform: rotate(90deg);
+}
+.prose details[open] > summary {
+  margin-bottom: 0.6em;
+}
+
+/* --- footnotes -------------------------------------------------------- */
+
+.prose .footnotes {
+  margin-top: 3.2em;
+  padding-top: 1.2em;
+  border-top: var(--hairline) solid var(--border);
+  color: var(--text-2);
+  font-size: 0.88em;
+}
+.prose .footnotes hr {
+  display: none;
+}
+.prose .footnotes ol {
+  padding-left: 1.3em;
+}
+.prose .footnotes li {
+  margin: 0.4em 0;
+}
+.prose .footnote-ref a {
+  padding: 0 0.12em;
+  text-decoration: none;
+  font-size: 0.82em;
+  font-variant-numeric: tabular-nums;
+  vertical-align: super;
+}
+.prose .footnote-backref {
+  text-decoration: none;
+  margin-left: 0.35em;
+  opacity: 0.7;
+}
+
+/* --- render failures -------------------------------------------------- */
+
+.doc-error {
+  max-width: var(--reading-width);
+  margin: 60px auto;
+  padding: 20px 22px;
+  border: var(--hairline) solid var(--border-strong);
+  border-left: 2.5px solid var(--hue-red);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+}
+.doc-error h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.doc-error p {
+  margin: 0 0 6px;
+  color: var(--text-2);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.doc-error code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  word-break: break-all;
+}

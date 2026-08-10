@@ -1,0 +1,408 @@
+/*
+ * Mermaid diagrams: the inline block with hover-revealed controls, and the
+ * fullscreen modal with pan/zoom. The modal is the only surface in the app
+ * that carries a real shadow — it is the one element meant to float.
+ */
+
+.mermaid-block {
+  position: relative;
+  margin: 1.7em 0;
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+
+/* While the first render is in flight, hold the space quietly. */
+.mermaid-block[data-state="pending"] {
+  min-height: 96px;
+}
+.mermaid-block[data-state="pending"]::after {
+  content: "Rendering diagram…";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-3);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.mermaid-source {
+  display: none;
+}
+
+/* The scroll frame. Zoom changes the SVG's box, so overflow gives real
+   scrollbars instead of a clipped transform. */
+.mermaid-frame {
+  overflow: auto;
+  /* Tall diagrams scroll inside the frame rather than pushing the prose apart;
+     fullscreen is where a big diagram is meant to be read. */
+  max-height: 78vh;
+  padding: 20px 18px;
+  border-radius: inherit;
+  overscroll-behavior: contain;
+}
+.mermaid-canvas {
+  display: flex;
+  justify-content: center;
+  min-width: min-content;
+}
+/* Once zoomed past the frame, pin to the left so panning feels predictable. */
+.mermaid-block[data-zoomed="true"] .mermaid-canvas {
+  justify-content: flex-start;
+}
+.mermaid-canvas > svg {
+  display: block;
+  height: auto;
+  cursor: zoom-in;
+}
+
+/* --- hover controls ---------------------------------------------------- */
+
+.mermaid-controls {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  /* Revealed on hover or keyboard focus; never in the way while reading. */
+  opacity: 0;
+  transform: translateY(-2px);
+  transition:
+    opacity var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+  pointer-events: none;
+}
+.mermaid-block:hover .mermaid-controls,
+.mermaid-block:focus-within .mermaid-controls {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.mmd-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    background var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+.mmd-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.mmd-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.mmd-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.mmd-zoom-label {
+  min-width: 40px;
+  padding: 0 2px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  user-select: none;
+}
+.mmd-sep {
+  width: 1px;
+  height: 15px;
+  margin: 0 2px;
+  background: var(--border);
+}
+
+/* A quiet caption row: diagram type on the left, hint on the right. */
+.mermaid-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 12px 7px;
+  color: var(--text-3);
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  user-select: none;
+}
+.mermaid-hint {
+  opacity: 0;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  transition: opacity var(--dur) var(--ease);
+}
+.mermaid-block:hover .mermaid-hint {
+  opacity: 1;
+}
+
+/* --- diagram that failed to parse ------------------------------------- */
+
+.mermaid-block[data-state="error"] {
+  border-left: 2.5px solid var(--hue-red);
+}
+.mermaid-error {
+  padding: 14px 16px;
+}
+.mermaid-error-title {
+  margin-bottom: 6px;
+  color: var(--hue-red);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.mermaid-error-msg {
+  margin: 0 0 10px;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.mermaid-error pre {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-code);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-x: auto;
+}
+
+/* ---------------------------------------------------------------------- *
+ * Fullscreen modal
+ * ---------------------------------------------------------------------- */
+
+.mmd-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(12px, 3.5vmin, 44px);
+  animation: mmd-fade 130ms var(--ease);
+}
+.mmd-modal.is-closing {
+  animation: mmd-fade 110ms var(--ease) reverse forwards;
+  /* Stop the outgoing scrim from swallowing clicks during its exit animation. */
+  pointer-events: none;
+}
+@keyframes mmd-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.mmd-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  backdrop-filter: blur(2px);
+}
+
+.mmd-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  max-width: 1600px;
+  border: var(--hairline) solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+  animation: mmd-rise 160ms var(--ease);
+}
+@keyframes mmd-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.994);
+  }
+}
+
+.mmd-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex: 0 0 auto;
+  height: 43px;
+  padding: 0 8px 0 16px;
+  border-bottom: var(--hairline) solid var(--border);
+  background: var(--bg);
+  user-select: none;
+}
+.mmd-bar-title {
+  min-width: 0;
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mmd-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.mmd-bar .mmd-btn {
+  min-width: 28px;
+  height: 28px;
+}
+.mmd-bar .mmd-btn.text {
+  padding: 0 10px;
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+.mmd-bar .mmd-zoom-label {
+  min-width: 52px;
+  font-size: 12px;
+  color: var(--text);
+}
+.mmd-close {
+  margin-left: 6px;
+}
+
+/* The pan surface. `touch-action: none` hands every gesture to our own
+   pointer handling so the trackpad cannot scroll the modal out from under us. */
+.mmd-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg);
+  cursor: grab;
+  touch-action: none;
+}
+.mmd-stage.is-panning {
+  cursor: grabbing;
+}
+
+/* Faint grid so panning has a sense of place. */
+.mmd-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image:
+    radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0);
+  background-size: 22px 22px;
+}
+
+.mmd-viewport {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.mmd-viewport > svg {
+  display: block;
+  max-width: none !important;
+}
+
+.mmd-hints {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 16px;
+  padding: 5px 13px;
+  border: var(--hairline) solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--text-3);
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0.9;
+  transition: opacity 300ms var(--ease);
+}
+.mmd-hints.is-faded {
+  opacity: 0;
+}
+.mmd-hints kbd {
+  padding: 0.5px 4px;
+  border: var(--hairline) solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+/* Mermaid emits `max-width` inline; the frame decides the size instead. */
+.mermaid-canvas > svg,
+.mmd-viewport > svg {
+  max-width: none;
+}
+
+/*
+ * A rendered diagram sits inside .prose, so the prose rules reach into its
+ * foreignObject labels — where mermaid uses <p> and sometimes lists. Mermaid's
+ * own generated CSS zeroes most of this, but restating it here keeps label text
+ * free of paragraph spacing and bullets across diagram types and versions.
+ */
+.mermaid-block foreignObject p,
+.mmd-viewport foreignObject p,
+.mermaid-block foreignObject ul,
+.mmd-viewport foreignObject ul,
+.mermaid-block foreignObject ol,
+.mmd-viewport foreignObject ol,
+.mermaid-block foreignObject li,
+.mmd-viewport foreignObject li {
+  margin: 0;
+  padding: 0;
+}
+.mermaid-block foreignObject li,
+.mmd-viewport foreignObject li {
+  list-style: none;
+}
+.mermaid-block foreignObject li::before,
+.mmd-viewport foreignObject li::before {
+  content: none;
+}
+.mermaid-block foreignObject a,
+.mmd-viewport foreignObject a {
+  text-decoration: none;
+}
+/* Keep diagram text selectable in the modal but not draggable while panning. */
+.mmd-stage svg text,
+.mmd-stage svg foreignObject {
+  user-select: none;
+}

@@ -1,0 +1,364 @@
+/* Preferences panel, quick-open palette, find bar, shortcuts sheet. */
+
+.overlay-root:empty {
+  display: none;
+}
+
+/* --- shared sheet chrome ---------------------------------------------- */
+
+.sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: var(--scrim);
+  animation: mmd-fade 120ms var(--ease);
+}
+
+.sheet {
+  position: fixed;
+  z-index: 81;
+  border: var(--hairline) solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+  animation: sheet-in 150ms var(--ease);
+}
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+.sheet-title {
+  padding: 13px 16px 11px;
+  border-bottom: var(--hairline) solid var(--border);
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+/* --- preferences ------------------------------------------------------ */
+
+.prefs {
+  top: calc(var(--topbar-h) + 8px);
+  right: 10px;
+  width: 288px;
+}
+.prefs-body {
+  padding: 6px 16px 14px;
+}
+.pref {
+  padding: 11px 0;
+  border-bottom: var(--hairline) solid var(--border);
+}
+.pref:last-child {
+  border-bottom: 0;
+}
+.pref-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pref-label {
+  color: var(--text);
+  font-size: 13px;
+}
+.pref-value {
+  color: var(--text-3);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+.pref input[type="range"] {
+  appearance: none;
+  width: 100%;
+  height: 18px;
+  margin: 8px 0 0;
+  background: transparent;
+  cursor: pointer;
+}
+.pref input[type="range"]::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 2px;
+  background: var(--border-strong);
+}
+.pref input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  margin-top: -5.5px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+}
+/* The measure slider is inert while the column fills the pane. */
+.pref input[type="range"]:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+.pref:has(input[type="range"]:disabled) .pref-label,
+.pref:has(input[type="range"]:disabled) .pref-value {
+  opacity: 0.5;
+}
+
+/* Segmented control for the theme choice. */
+.seg {
+  display: flex;
+  gap: 1px;
+  padding: 2px;
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-code);
+}
+.seg button {
+  flex: 1 1 0;
+  padding: 4px 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.seg button:hover {
+  color: var(--text);
+}
+.seg button[aria-pressed="true"] {
+  background: var(--bg-raised);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+/* Checkbox row */
+.pref-check {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+}
+.pref-check input {
+  appearance: none;
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  border: 1.4px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--bg);
+  cursor: pointer;
+}
+.pref-check input:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.pref-check input:checked::after {
+  content: "";
+  display: block;
+  width: 4px;
+  height: 8px;
+  margin: 1px 0 0 4px;
+  border: 1.6px solid var(--bg-raised);
+  border-top: 0;
+  border-left: 0;
+  transform: rotate(41deg);
+}
+
+.prefs-foot {
+  padding: 10px 16px;
+  border-top: var(--hairline) solid var(--border);
+  background: var(--bg);
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.prefs-foot code {
+  font-family: var(--font-mono);
+  word-break: break-all;
+}
+
+/* --- quick open ------------------------------------------------------- */
+
+.quickopen {
+  top: 12vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 40px));
+  display: flex;
+  flex-direction: column;
+  max-height: 60vh;
+}
+.qo-input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: var(--hairline) solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+}
+.qo-input::placeholder {
+  color: var(--text-3);
+}
+.qo-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 5px;
+}
+.qo-item {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 11px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.qo-item:hover {
+  background: var(--bg-hover);
+}
+.qo-item.is-selected {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.qo-name {
+  flex: 0 0 auto;
+  font-weight: 500;
+}
+.qo-path {
+  min-width: 0;
+  color: var(--text-3);
+  font-size: 11.5px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+.qo-item.is-selected .qo-path {
+  color: var(--accent);
+  opacity: 0.75;
+}
+.qo-empty {
+  padding: 16px;
+  color: var(--text-3);
+  font-size: 12.5px;
+  text-align: center;
+}
+.qo-match {
+  color: var(--accent);
+  font-weight: 650;
+}
+
+/* --- find bar --------------------------------------------------------- */
+
+.findbar {
+  position: absolute;
+  top: 9px;
+  right: 18px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 4px 4px 11px;
+  border: var(--hairline) solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-modal);
+}
+.findbar input {
+  width: 168px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+.find-count {
+  min-width: 56px;
+  color: var(--text-3);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.find-count.is-none {
+  color: var(--hue-red);
+}
+
+/* Find highlights are painted with the CSS Custom Highlight API. */
+::highlight(find-hit) {
+  background-color: var(--selection);
+  color: var(--text);
+}
+::highlight(find-hit-active) {
+  background-color: var(--accent);
+  color: var(--bg);
+}
+
+/* --- shortcuts sheet -------------------------------------------------- */
+
+.shortcuts {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(620px, calc(100vw - 48px));
+  max-height: min(78vh, 700px);
+  display: flex;
+  flex-direction: column;
+}
+.shortcuts-body {
+  overflow-y: auto;
+  padding: 6px 20px 20px;
+  columns: 2;
+  column-gap: 30px;
+}
+@media (max-width: 620px) {
+  .shortcuts-body {
+    columns: 1;
+  }
+}
+.shortcuts-group {
+  break-inside: avoid;
+  margin-top: 16px;
+}
+.shortcuts-group h3 {
+  margin: 0 0 6px;
+  color: var(--text-3);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.shortcut {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 3px 0;
+  font-size: 12.5px;
+}
+.shortcut span {
+  color: var(--text-2);
+}
+.shortcut kbd {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border: var(--hairline) solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
