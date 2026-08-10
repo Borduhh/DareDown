@@ -1,0 +1,164 @@
+# Contributing to DareDown
+
+Thanks for looking. DareDown is a small, deliberately narrow app: a read-only
+Markdown viewer that works offline. Changes that keep it small and quiet are
+easier to land than ones that widen its scope.
+
+Two constraints are load-bearing, and a change that breaks either needs to say
+so explicitly in its pull request:
+
+- **It stays offline.** No network calls at runtime, no telemetry, no accounts.
+  Enforced in three independent places — see
+  [Offline and read-only](README.md#offline-and-read-only-enforced).
+- **It stays read-only.** There is no editing surface, and the Markdown a user
+  opens is treated as untrusted input.
+
+## Development
+
+```bash
+npm run dev        # rebuild renderer on change + launch Electron
+npm start          # one-shot build + run
+npm run harness    # build dist/renderer/dev.html
+```
+
+`npm run harness` emits a page that runs the real renderer against a stubbed IPC
+bridge with `samples/` inlined, so the reading experience, theming and the diagram
+modal can be checked in any browser without launching Electron. It also shims
+`matchMedia` the way `nativeTheme.themeSource` behaves in the real app. Never shipped.
+
+Set `DAREDOWN_DEBUG=1` to enable DevTools and the View ▸ Toggle Developer Tools item.
+
+### Layout
+
+```
+src/main/         main process — window, menu, config, watcher, IPC
+  index.js          lifecycle, IPC handlers, network block
+  config.js         atomic JSON preference store
+  files.js          reading documents, walking folders, resolving links
+  watcher.js        chokidar wrapper with atomic-save handling
+  preload.js        the only renderer↔Node bridge
+src/renderer/
+  main.js           app wiring: tabs, sidebar views, commands, live reload, boot
+  markdown.js       markdown-it pipeline, sanitizer, DOM post-pass
+  mermaid-view.js   diagram render, inline zoom, fullscreen pan/zoom
+  mermaid-theme.js  Mermaid themeVariables derived from the palette
+  tabs.js tree.js outline.js find.js overlays.js toast.js
+  styles/           tokens, shell, sidebar, prose, code, mermaid, overlays
+build/icon.png      the app icon, source asset for .icns and .ico
+scripts/build.mjs   esbuild bundle + harness generator
+scripts/check-icon.mjs  refuses to package without a usable icon
+scripts/after-pack.mjs  ad-hoc signs macOS builds when no Developer ID is present
+.releaserc.json     semantic-release: how commits map to versions
+commitlint.config.js  commit-message rules enforced on pull requests
+.github/workflows/  ci.yml (build + commit lint), release.yml (version + installers)
+```
+
+Two notes for anyone editing this:
+
+- **The renderer bundles as an IIFE, not ESM.** A `file://` page cannot load module
+  scripts, so `scripts/build.mjs` disables code splitting to force esbuild to inline
+  Mermaid's lazily-imported diagram modules, then fails the build if any dynamic
+  `import(` survives. Switching to `format: 'esm'` would silently break diagram types.
+- **Mermaid emits `<g class="node">`, and diagram SVGs live inside `.prose`.** Sidebar
+  and prose CSS must not use selectors generic enough to reach into a diagram; the
+  tree rules are scoped under `.tree` for exactly this reason.
+
+`markdown-it`, `highlight.js` and `mermaid` are devDependencies on purpose: they are
+compiled into `dist/renderer/app.js`, so shipping them in `node_modules` would double
+their weight. `chokidar` is the only runtime dependency, which keeps the packaged
+asar around 4 MB.
+
+## Packaging
+
+```bash
+npm run dist:mac      # dmg + zip, arm64 and x64
+npm run dist:win      # nsis installer + portable
+npm run dist:linux    # AppImage + deb
+npm run pack          # unpacked directory, for a quick check
+```
+
+Output lands in `release/`. `.md` and friends are registered as openable document
+types on all three platforms.
+
+macOS builds are **ad-hoc signed, not notarised**. With no Developer ID on the
+machine, electron-builder skips signing entirely and leaves Electron's own
+signature on the renamed binary, which macOS rejects outright as damaged;
+`scripts/after-pack.mjs` re-signs ad-hoc so you get the ordinary
+unidentified-developer prompt instead. Set `CSC_LINK` and `CSC_KEY_PASSWORD` and
+it steps aside so a real identity is used.
+
+The app icon is a committed source asset at **`build/icon.png`** — a square PNG,
+1024×1024, from which electron-builder generates the macOS `.icns` and Windows
+`.ico`. `scripts/check-icon.mjs` runs before every package and fails the build if
+it is missing, non-square or under 512px, because electron-builder would otherwise
+substitute the stock Electron icon with only a warning.
+
+The icon is a filled tile by design — its background is intentionally opaque
+rather than transparent, so it reads as a folder on any surface.
+
+## Versioning and releases
+
+Versions are derived from commit messages by
+[semantic-release](https://semantic-release.gitbook.io/). **Don't edit `version` in
+`package.json`** — it is written by the release job and committed back.
+
+Write [Conventional Commits](https://www.conventionalcommits.org/):
+
+| Commit type | Release | Version | Example |
+|---|---|---|---|
+| `fix:` `perf:` `refactor:` `style:` `revert:` | patch | `1.0.1` → `1.0.2` | `fix(outline): clamp scroll offset` |
+| `feat:` | minor | `1.0.1` → `1.1.0` | `feat(mermaid): support radar charts` |
+| `feat!:` or a `BREAKING CHANGE:` footer | major | `1.0.1` → `2.0.0` | `feat(prefs)!: drop legacy config keys` |
+| `docs:` `test:` `build:` `ci:` `chore:` | none | — | `docs: fix a typo` |
+
+Scopes are conventional but optional: `feat(mermaid): …`, `fix(outline): …`. The
+allowed list is in `commitlint.config.js`, and CI warns rather than fails on an
+unfamiliar one. Commit messages on pull requests are linted, because an
+unparseable message silently changes what version ships.
+
+Pushing to `main` runs `.github/workflows/release.yml`, which:
+
+1. works out the next version from the commits since the last tag — and stops
+   right there if nothing warrants a release;
+2. updates `CHANGELOG.md` and `package.json`, commits them as
+   `chore(release): x.y.z [skip ci]`, and tags `vx.y.z`;
+3. creates the GitHub Release with generated notes;
+4. builds macOS, Windows and Linux installers from that tag in parallel and
+   uploads them to the release.
+
+Pushing to `next` publishes a prerelease (`1.2.0-next.1`) on the `next` dist-tag
+instead. To see what *would* happen without touching anything:
+
+```bash
+npm run release:dry
+```
+
+## Icons
+
+`build/icon-source.png` is the artwork of record — the full 1024×1024 image with
+its background. Everything else in `build/` is derived from it:
+
+```bash
+npm run icons
+```
+
+That writes `icon.png` (transparent master, used for Linux), `icon.icns` (macOS)
+and `icon.ico` (Windows). All four are committed, because `sips` and `iconutil`
+are macOS-only and CI must not have to run this.
+
+Two things the script does that a single resize cannot:
+
+- **Keys the background to transparency.** The artwork sits on an opaque
+  near-white field, and macOS and Windows composite that as a pale square tile
+  rather than cropping to the shape. A flood fill inward from the border is used
+  rather than a colour key, because the field is dozens of shades of near-white.
+- **Gives the small renditions different art.** At 16 and 32px the folder plus
+  wordmark collapses into an unreadable smudge, so those sizes get the monogram
+  alone on a rounded tile; 128px and up keep the full folder. The monogram is
+  located by finding the largest connected red region, and the wordmark's top
+  edge is measured so it can be masked out rather than clipped — re-exporting
+  the source at a different composition will not silently crop the wrong area.
+
+`scripts/check-icon.mjs` runs before every package and fails the build if the
+icon is missing, non-square or under 512px, because electron-builder otherwise
+substitutes the stock Electron icon with only a warning.
