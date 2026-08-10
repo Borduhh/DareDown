@@ -32,6 +32,7 @@
   "main": "src/main/index.js",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "icons": "node scripts/make-icons.mjs",
     "dev": "node scripts/build.mjs --watch --electron",
     "start": "npm run build && electron .",
     "open:samples": "npm run build && electron . samples/README.md",
