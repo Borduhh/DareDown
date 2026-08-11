@@ -26,6 +26,9 @@ import { toast } from './toast.js';
 
 const api = window.daredown;
 
+/** GitHub Sponsors page, opened in the OS browser from the sidebar footer. */
+const SPONSOR_URL = 'https://github.com/sponsors/Borduhh';
+
 const el = {
   app: document.getElementById('app'),
   topbar: document.getElementById('topbar'),
@@ -47,6 +50,7 @@ const el = {
   btnTheme: document.getElementById('btn-theme'),
   btnPrefs: document.getElementById('btn-prefs'),
   btnOpenFolder: document.getElementById('btn-open-folder'),
+  btnSponsor: document.getElementById('btn-sponsor'),
   welcomeFile: document.getElementById('welcome-file'),
   welcomeFolder: document.getElementById('welcome-folder'),
 };
@@ -695,6 +699,12 @@ const commands = {
   'sidebar:switch': () =>
     showSidebarPane(state.prefs.sidebarPane === 'outline' ? 'files' : 'outline'),
   'theme:cycle': () => toggleTheme(),
+  // Handed to the OS browser rather than fetched: the app itself still makes no
+  // network requests, so the offline guarantee is untouched.
+  'sponsor:open': async () => {
+    const opened = await api.openExternal(SPONSOR_URL);
+    if (!opened) toast('Could not open your browser', { error: true });
+  },
   'font:bigger': () => updatePrefs({ fontSize: clampPref(state.prefs.fontSize + 1, 13, 24) }),
   'font:smaller': () => updatePrefs({ fontSize: clampPref(state.prefs.fontSize - 1, 13, 24) }),
   'font:reset': () => updatePrefs({ fontSize: 17 }),
@@ -779,6 +789,7 @@ el.sidebarTabs.addEventListener('click', (event) => {
 });
 el.btnPrefs.addEventListener('click', () => run('prefs:toggle'));
 el.btnOpenFolder.addEventListener('click', () => run('folder:open'));
+el.btnSponsor.addEventListener('click', () => run('sponsor:open'));
 el.welcomeFile.addEventListener('click', () => run('file:open'));
 el.welcomeFolder.addEventListener('click', () => run('folder:open'));
 

@@ -119,6 +119,8 @@ function buildMenu(handlers) {
     submenu: [
       { label: 'Keyboard Shortcuts', accelerator: 'CmdOrCtrl+/', ...send('help:shortcuts') },
       { type: 'separator' },
+      { label: 'Sponsor DareDown…', ...send('sponsor:open') },
+      { type: 'separator' },
       {
         label: 'Open Config File Location',
         click: () => shell.showItemInFolder(config.configPath()),
