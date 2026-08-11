@@ -1,7 +1,7 @@
 {
   "name": "daredown",
   "productName": "DareDown",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "description": "A markdown reader that isn't afraid of anything — not even your gnarliest .md files.",
   "private": true,
   "author": {
