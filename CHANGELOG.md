@@ -3,6 +3,12 @@
 Every release on this page is derived from commit messages by semantic-release.
 Do not edit it by hand.
 
+## [1.2.1](https://github.com/Borduhh/DareDown/compare/v1.2.0...v1.2.1) (2026-08-11)
+
+### Bug Fixes
+
+* **ci:** remove empty signing vars instead of leaving them blank ([7417f79](https://github.com/Borduhh/DareDown/commit/7417f795f3478cedf74608cc4c8a87565b36514a))
+
 ## [1.2.0](https://github.com/Borduhh/DareDown/compare/v1.1.0...v1.2.0) (2026-08-11)
 
 ### Features
