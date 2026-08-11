@@ -3,6 +3,12 @@
 Every release on this page is derived from commit messages by semantic-release.
 Do not edit it by hand.
 
+## [1.4.1](https://github.com/Borduhh/DareDown/compare/v1.4.0...v1.4.1) (2026-08-11)
+
+### Bug Fixes
+
+* **packaging:** drop the Windows portable target ([c083db4](https://github.com/Borduhh/DareDown/commit/c083db482ce3d8775e8953db66a45680f3b9ffc9))
+
 ## [1.4.0](https://github.com/Borduhh/DareDown/compare/v1.3.1...v1.4.0) (2026-08-11)
 
 ### Features
