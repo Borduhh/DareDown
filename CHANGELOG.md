@@ -3,6 +3,12 @@
 Every release on this page is derived from commit messages by semantic-release.
 Do not edit it by hand.
 
+## [1.1.0](https://github.com/Borduhh/DareDown/compare/v1.0.3...v1.1.0) (2026-08-11)
+
+### Features
+
+* add a sponsor link to the foot of the sidebar ([7811dc3](https://github.com/Borduhh/DareDown/commit/7811dc3bcee7c618107228ab158fd3db99833ea0))
+
 ## [1.0.3](https://github.com/Borduhh/DareDown/compare/v1.0.2...v1.0.3) (2026-08-10)
 
 ### Bug Fixes
