@@ -3,6 +3,12 @@
 Every release on this page is derived from commit messages by semantic-release.
 Do not edit it by hand.
 
+## [1.3.1](https://github.com/Borduhh/DareDown/compare/v1.3.0...v1.3.1) (2026-08-11)
+
+### Refactoring
+
+* convert the renderer to TypeScript and type-check the main process ([6181fa3](https://github.com/Borduhh/DareDown/commit/6181fa3b8844681428565100d759c3236479f3f6))
+
 ## [1.3.0](https://github.com/Borduhh/DareDown/compare/v1.2.1...v1.3.0) (2026-08-11)
 
 ### Features
