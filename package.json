@@ -50,7 +50,8 @@
     "commitlint": "commitlint --from origin/main --to HEAD --verbose"
   },
   "dependencies": {
-    "chokidar": "^5.0.0"
+    "chokidar": "^5.0.0",
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",
@@ -182,6 +183,13 @@
       ],
       "maintainer": "Borduhh <4759596+Borduhh@users.noreply.github.com>"
     },
-    "afterPack": "scripts/after-pack.mjs"
+    "afterPack": "scripts/after-pack.mjs",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Borduhh",
+        "repo": "DareDown"
+      }
+    ]
   }
 }

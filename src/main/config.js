@@ -20,6 +20,7 @@ const DEFAULTS = {
   sidebarWidth: 260,
   sidebarPane: 'files', // 'files' | 'outline'
   wrapCode: false,
+  autoUpdate: false, // check GitHub for a newer release on launch
   lastFolder: null,
   lastFiles: [], // absolute paths of tabs open at quit
   activeFile: null,
@@ -82,7 +83,7 @@ function sanitize(raw) {
   out.readingWidth = clampNumber('readingWidth', raw.readingWidth, DEFAULTS.readingWidth);
   out.fontSize = clampNumber('fontSize', raw.fontSize, DEFAULTS.fontSize);
   out.sidebarWidth = clampNumber('sidebarWidth', raw.sidebarWidth, DEFAULTS.sidebarWidth);
-  for (const flag of /** @type {const} */ (['sidebarVisible', 'fullWidth', 'wrapCode'])) {
+  for (const flag of /** @type {const} */ (['sidebarVisible', 'fullWidth', 'wrapCode', 'autoUpdate'])) {
     if (typeof raw[flag] === 'boolean') out[flag] = raw[flag];
   }
   if (['files', 'outline'].includes(raw.sidebarPane)) out.sidebarPane = raw.sidebarPane;

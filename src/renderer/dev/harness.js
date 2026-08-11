@@ -30,6 +30,7 @@
     sidebarPane: 'files',
     fullWidth: false,
     wrapCode: false,
+    autoUpdate: false,
     lastFolder: FIXTURES.root,
     lastFiles: FIXTURES.openFiles || [],
     activeFile: FIXTURES.activeFile || null,
@@ -180,6 +181,15 @@
     onNativeThemeChanged: (h) => register('theme', h),
     onMenuCommand: (h) => register('menu', h),
     onOpenPaths: (h) => register('open-paths', h),
+
+    checkForUpdates: async () => {
+      // No network in the harness; report the state the app would show.
+      for (const handler of listeners.get('update-status') || []) {
+        handler({ state: 'unsupported', message: 'Updates are unavailable in the harness.' });
+      }
+    },
+    installUpdate: async () => console.info('[harness] installUpdate'),
+    onUpdateStatus: (h) => register('update-status', h),
 
     ready: async () => ({ platform: 'darwin', version: '0.0.0-harness' }),
   };

@@ -58,6 +58,11 @@ const api = {
   onMenuCommand: (/** @type {any} */ handler) => on('menu:command', handler),
   onOpenPaths: (/** @type {any} */ handler) => on('app:open-paths', handler),
 
+  // ---- updates ---------------------------------------------------------
+  checkForUpdates: () => ipcRenderer.invoke('update:check'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  onUpdateStatus: (/** @type {any} */ handler) => on('update:status', handler),
+
   // ---- lifecycle -------------------------------------------------------
   /** Renderer tells main it is ready so queued file-open requests can flush. */
   ready: () => ipcRenderer.invoke('app:renderer-ready'),

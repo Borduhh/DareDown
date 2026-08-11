@@ -122,6 +122,8 @@ function buildMenu(handlers) {
     submenu: [
       { label: 'Keyboard Shortcuts', accelerator: 'CmdOrCtrl+/', ...send('help:shortcuts') },
       { type: 'separator' },
+      { label: 'Check for Updates…', ...send('update:check') },
+      { type: 'separator' },
       { label: 'Sponsor DareDown…', ...send('sponsor:open') },
       { type: 'separator' },
       {

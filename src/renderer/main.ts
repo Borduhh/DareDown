@@ -25,7 +25,13 @@ import { Find } from './find.js';
 import { openPreferences, openQuickOpen, openShortcuts } from './overlays.js';
 import { toast } from './toast.js';
 
-import type { Config, ConfigPatch, MarkdownDocument, SidebarPane } from '../types/bridge.js';
+import type {
+  Config,
+  ConfigPatch,
+  MarkdownDocument,
+  SidebarPane,
+  UpdateStatus,
+} from '../types/bridge.js';
 
 const api = window.daredown;
 
@@ -745,6 +751,11 @@ const commands = {
   'sidebar:switch': () =>
     showSidebarPane(prefs().sidebarPane === 'outline' ? 'files' : 'outline'),
   'theme:cycle': () => toggleTheme(),
+  'update:check': () => {
+    // Explicit request, so it runs whether or not the launch check is enabled.
+    toast('Checking for updates…');
+    void api.checkForUpdates();
+  },
   // Handed to the OS browser rather than fetched: the app itself still makes no
   // network requests, so the offline guarantee is untouched.
   'sponsor:open': async () => {
@@ -840,6 +851,36 @@ el.sidebarTabs.addEventListener('click', (event: MouseEvent) => {
 el.btnPrefs.addEventListener('click', () => run('prefs:toggle'));
 el.btnOpenFolder.addEventListener('click', () => run('folder:open'));
 el.btnSponsor.addEventListener('click', () => run('sponsor:open'));
+
+/**
+ * Update progress, surfaced as toasts rather than a panel: it is background
+ * information, and the reader asked for a reader.
+ */
+api.onUpdateStatus((status: UpdateStatus) => {
+  switch (status.state) {
+    case 'available':
+      toast(`Version ${status.version ?? ''} available — downloading`.trim());
+      break;
+    case 'ready':
+      // Deliberately long: this one needs to survive being glanced at.
+      toast(`Version ${status.version ?? ''} is ready — restart to install`.trim(), {
+        duration: 12000,
+      });
+      break;
+    case 'current':
+      toast('DareDown is up to date');
+      break;
+    case 'unsupported':
+      toast(status.message ?? 'Updates are unavailable in this build');
+      break;
+    case 'error':
+      toast(`Could not check for updates: ${status.message ?? 'unknown error'}`, { error: true });
+      break;
+    default:
+      // 'checking' and 'downloading' are noise once a check is under way.
+      break;
+  }
+});
 el.welcomeFile.addEventListener('click', () => run('file:open'));
 el.welcomeFolder.addEventListener('click', () => run('folder:open'));
 
@@ -992,6 +1033,12 @@ async function boot() {
   syncWorkspace();
 
   // Tell main we are listening; queued "open with" paths arrive right after.
+  // Opt-in only, and after the first document is on screen so it never competes
+  // with rendering. A manual check from Help works regardless of this setting.
+  if (prefs().autoUpdate) {
+    setTimeout(() => void api.checkForUpdates(), 4000);
+  }
+
   await api.ready();
 }
 

@@ -36,6 +36,8 @@ export interface Config {
   sidebarWidth: number;
   sidebarPane: SidebarPane;
   wrapCode: boolean;
+  /** Check GitHub for a newer release on launch. Off by default. */
+  autoUpdate: boolean;
   lastFolder: string | null;
   lastFiles: string[];
   activeFile: string | null;
@@ -110,6 +112,24 @@ export interface RendererReady {
   version: string;
 }
 
+export type UpdateState =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'downloading'
+  | 'ready'
+  | 'current'
+  | 'error'
+  | 'unsupported';
+
+export interface UpdateStatus {
+  state: UpdateState;
+  version?: string;
+  /** Download progress, 0-100. */
+  percent?: number;
+  message?: string;
+}
+
 /** Every `on*` member returns its own unsubscribe function. */
 export type Unsubscribe = () => void;
 
@@ -149,6 +169,13 @@ export interface DareDownApi {
   onNativeThemeChanged(handler: (isDark: boolean) => void): Unsubscribe;
   onMenuCommand(handler: (payload: MenuCommand) => void): Unsubscribe;
   onOpenPaths(handler: (paths: string[]) => void): Unsubscribe;
+
+  // ---- updates ---------------------------------------------------------
+  /** Ask GitHub for a newer release. Progress arrives via onUpdateStatus. */
+  checkForUpdates(): Promise<void>;
+  /** Restart into an already-downloaded update. */
+  installUpdate(): Promise<void>;
+  onUpdateStatus(handler: (status: UpdateStatus) => void): Unsubscribe;
 
   // ---- lifecycle -------------------------------------------------------
   ready(): Promise<RendererReady>;

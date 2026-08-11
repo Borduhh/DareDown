@@ -7,7 +7,7 @@
 **A markdown reader that isn't afraid of anything — not even your gnarliest .md files.**
 
 [![Platforms](https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-2C2A26?style=flat-square)](https://github.com/Borduhh/DareDown/releases)
-[![Offline](https://img.shields.io/badge/offline-no%20network%20calls-4F7245?style=flat-square)](#offline-and-read-only-enforced)
+[![Offline](https://img.shields.io/badge/offline-by%20default-4F7245?style=flat-square)](#offline-and-read-only-enforced)
 [![License](https://img.shields.io/badge/license-MIT-6B6862?style=flat-square)](LICENSE)
 
 </div>
@@ -105,7 +105,8 @@ folder and tabs all persist to one JSON file you can read or delete:
 
 ## Offline and read-only, enforced
 
-The constraint is load-bearing, so it is enforced in three independent places:
+Nothing you read can reach the network, and that is enforced in three independent
+places rather than trusted:
 
 1. Everything is bundled — Mermaid, highlight.js, markdown-it. There are no
    remote assets and no web fonts; the UI uses system font stacks.
@@ -114,9 +115,24 @@ The constraint is load-bearing, so it is enforced in three independent places:
 3. A CSP in `src/renderer/index.html` sets `connect-src 'none'` and refuses inline
    scripts, so raw HTML inside a Markdown file cannot execute or phone home.
 
-No telemetry, no accounts, no cloud sync. The renderer is sandboxed with
-`contextIsolation` on and reaches Node only through the small, explicit bridge in
-`src/main/preload.js`.
+No telemetry, no accounts, no cloud sync.
+
+**The one exception is update checking, and it is off by default.** Turn on
+*Check for updates on launch* in preferences, or use **Help → Check for
+Updates…**, and DareDown asks GitHub whether a newer release exists. Nothing else
+is sent — no identifiers, no usage data; it is a request for a release list.
+
+That request runs in the main process over Node's HTTPS, which is deliberately
+*not* the path the three protections above guard. Those exist to stop a document
+you opened from calling out, which they still do completely. A Markdown file
+cannot trigger an update check or see its result.
+
+### Updating
+
+Once an update is downloaded, DareDown says so and waits — it never restarts
+while you are reading. Choose to restart, or quit normally and it installs then.
+macOS builds are notarised, so the update is signature-checked before it replaces
+the app.
 
 ## Shortcuts
 

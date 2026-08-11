@@ -178,6 +178,32 @@ substitute the stock Electron icon with only a warning.
 The icon is a filled tile by design — its background is intentionally opaque
 rather than transparent, so it reads as a folder on any surface.
 
+## Updates
+
+`electron-updater`, opt-in, wired in `src/main/updater.js`. Four things about it
+are non-obvious:
+
+- **It needs `build.publish` set** even though the dist scripts all pass
+  `--publish never`. That config is the only reason electron-builder writes
+  `app-update.yml` into the bundle, and electron-updater fails with a confusing
+  ENOENT without it. It does not cause anything to be published.
+- **`app-update.yml` is only written for real targets.** `npm run pack` uses
+  `--dir` and skips it, so an update check in a `pack` build will not work. Build
+  a dmg or zip to test.
+- **macOS requires a signed, notarised build.** Squirrel.Mac verifies the
+  incoming bundle against the running app's designated requirement, and an
+  ad-hoc signature's requirement is pinned to its own cdhash — so no future
+  build can ever satisfy it. This is why auto-update was impossible before the
+  Developer ID.
+- **It bypasses the offline protections by design.** electron-updater uses Node's
+  https, not Chromium's network stack, so `installNetworkBlock` never sees it.
+  That is correct: those protections exist to stop an untrusted document calling
+  out from the renderer, and the updater runs in main where no document reaches
+  it. Do not "fix" this by routing the updater through the session.
+
+`electron-updater` is a runtime dependency, unlike the rest — it has to ship. It
+takes the asar from roughly 3.8 MB to 4.9 MB.
+
 ## Versioning and releases
 
 Versions are derived from commit messages by

@@ -175,7 +175,13 @@ export function openPreferences({
     onChange: (checked) => onChange({ wrapCode: checked }),
   });
 
-  body.append(themeField, widthField, fullWidthField, sizeField, wrapField);
+  const autoUpdateField = checkbox({
+    label: 'Check for updates on launch',
+    checked: Boolean(prefs.autoUpdate),
+    onChange: (checked) => onChange({ autoUpdate: checked }),
+  });
+
+  body.append(themeField, widthField, fullWidthField, sizeField, wrapField, autoUpdateField);
 
   const foot = document.createElement('div');
   foot.className = 'prefs-foot';

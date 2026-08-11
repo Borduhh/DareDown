@@ -27,6 +27,7 @@ const config = require('./config');
 const files = require('./files');
 const { buildMenu } = require('./menu');
 const { Watcher } = require('./watcher');
+const updates = require('./updater');
 
 const RENDERER_HTML = path.join(__dirname, '..', '..', 'dist', 'renderer', 'index.html');
 
@@ -340,6 +341,9 @@ function registerIpc() {
     return nativeTheme.shouldUseDarkColors;
   });
 
+  ipcMain.handle('update:check', () => updates.check());
+  ipcMain.handle('update:install', () => updates.install());
+
   ipcMain.handle('watch:set', async (_event, payload) => {
     if (!watcher) return false;
     const openFiles = Array.isArray(payload?.files)
@@ -365,6 +369,10 @@ app.whenReady().then(() => {
   installNetworkBlock(session.defaultSession);
   applyThemeSource(config.get().theme);
   registerIpc();
+
+  updates.configure((status) => {
+    if (win && !win.isDestroyed()) win.webContents.send('update:status', status);
+  });
 
   watcher = new Watcher((payload) => {
     if (!win || win.isDestroyed()) return;
