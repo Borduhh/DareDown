@@ -127,6 +127,11 @@ That request runs in the main process over Node's HTTPS, which is deliberately
 you opened from calling out, which they still do completely. A Markdown file
 cannot trigger an update check or see its result.
 
+### Which version am I running?
+
+Preferences (`⌘,`) shows it at the bottom, on every platform. macOS also has
+**DareDown → About DareDown**; Windows and Linux have **Help → About DareDown**.
+
 ### Updating
 
 Once an update is downloaded, DareDown says so and waits — it never restarts

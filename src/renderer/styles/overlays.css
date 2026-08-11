@@ -178,6 +178,13 @@
   font-family: var(--font-mono);
   word-break: break-all;
 }
+/* Version above the config path: the same footer answers "what am I running?"
+   and "where does it save?", which are the two app-level questions. */
+.prefs-version {
+  margin-bottom: 3px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
 
 /* --- quick open ------------------------------------------------------- */
 

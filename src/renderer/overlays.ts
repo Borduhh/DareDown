@@ -83,6 +83,8 @@ export interface PreferencesOptions {
   prefs: Config;
   onChange(patch: ConfigPatch): void;
   configPath: string;
+  /** Shown in the footer — the only place Windows and Linux surface it. */
+  version: string;
   onClose: () => void;
 }
 
@@ -90,6 +92,7 @@ export function openPreferences({
   prefs,
   onChange,
   configPath,
+  version,
   onClose,
 }: PreferencesOptions): SheetController {
   const sheet = document.createElement('div');
@@ -185,10 +188,15 @@ export function openPreferences({
 
   const foot = document.createElement('div');
   foot.className = 'prefs-foot';
-  foot.append(document.createTextNode('Saved to '));
+  const versionLine = document.createElement('div');
+  versionLine.className = 'prefs-version';
+  versionLine.textContent = version ? `DareDown ${version}` : 'DareDown';
+  const savedLine = document.createElement('div');
+  savedLine.append(document.createTextNode('Saved to '));
   const code = document.createElement('code');
   code.textContent = configPath || 'config.json';
-  foot.append(code);
+  savedLine.append(code);
+  foot.append(versionLine, savedLine);
 
   sheet.append(title, body, foot);
   return mountSheet(sheet, { onClose, scrim: true, initialFocus: seg.firstElementChild as HTMLElement | null });

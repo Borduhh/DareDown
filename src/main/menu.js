@@ -4,10 +4,27 @@
  * (open dialogs, window controls) or forward a named command to the renderer
  * over the `menu:command` channel.
  */
-const { app, Menu, shell } = require('electron');
+const { app, dialog, Menu, shell } = require('electron');
 const config = require('./config');
 
 const isMac = process.platform === 'darwin';
+
+/** The Windows and Linux stand-in for macOS's native About panel. */
+function showAbout() {
+  dialog.showMessageBox({
+    type: 'none',
+    title: 'About DareDown',
+    message: `DareDown ${app.getVersion()}`,
+    detail: [
+      "A markdown reader that isn't afraid of anything.",
+      '',
+      `Electron ${process.versions.electron}  ·  Chromium ${process.versions.chrome}`,
+      'github.com/Borduhh/DareDown',
+    ].join('\n'),
+    buttons: ['OK'],
+    defaultId: 0,
+  });
+}
 
 /**
  * @param {{ onCommand: (command: string, arg?: unknown) => void }} handlers
@@ -122,6 +139,15 @@ function buildMenu(handlers) {
     submenu: [
       { label: 'Keyboard Shortcuts', accelerator: 'CmdOrCtrl+/', ...send('help:shortcuts') },
       { type: 'separator' },
+      // macOS carries this in the app menu as the native About panel; Windows
+      // and Linux have no app menu, so without this there is nowhere at all to
+      // see which version you are running.
+      .../** @type {Electron.MenuItemConstructorOptions[]} */ (isMac
+        ? []
+        : [
+            { label: 'About DareDown', click: () => showAbout() },
+            { type: 'separator' },
+          ]),
       { label: 'Check for Updates…', ...send('update:check') },
       { type: 'separator' },
       { label: 'Sponsor DareDown…', ...send('sponsor:open') },

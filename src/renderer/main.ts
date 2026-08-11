@@ -79,6 +79,8 @@ interface AppState {
   prefs: Config | null;
   folder: string | null;
   configPath: string;
+  /** From the main process at boot; the About surface on Windows and Linux. */
+  version: string;
   isMac: boolean;
   /** Tabs whose file changed on disk while they were in the background. */
   stale: Set<string>;
@@ -99,6 +101,7 @@ const state: AppState = {
   prefs: null,
   folder: null,
   configPath: '',
+  version: '',
   isMac: api.platform === 'darwin',
   stale: new Set(),
   renderToken: 0,
@@ -813,6 +816,7 @@ function togglePreferences() {
     openPreferences({
       prefs: prefs(),
       configPath: state.configPath,
+      version: state.version,
       onChange: (patch) => updatePrefs(patch),
       onClose: clearSheet,
     })
@@ -1039,7 +1043,8 @@ async function boot() {
     setTimeout(() => void api.checkForUpdates(), 4000);
   }
 
-  await api.ready();
+  const { version } = await api.ready();
+  state.version = version;
 }
 
 boot().catch((err) => {
