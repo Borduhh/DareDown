@@ -3,6 +3,12 @@
 Every release on this page is derived from commit messages by semantic-release.
 Do not edit it by hand.
 
+## [1.2.0](https://github.com/Borduhh/DareDown/compare/v1.1.0...v1.2.0) (2026-08-11)
+
+### Features
+
+* **packaging:** sign macOS builds with a Developer ID and notarise in CI ([4e1b357](https://github.com/Borduhh/DareDown/commit/4e1b35723c3f1077ed1bb744c8fa0890d9459ca2))
+
 ## [1.1.0](https://github.com/Borduhh/DareDown/compare/v1.0.3...v1.1.0) (2026-08-11)
 
 ### Features
