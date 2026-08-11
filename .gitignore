@@ -7,5 +7,20 @@ release/
 # Written by semantic-release's exec plugin to signal that a release happened.
 .released-version
 
+# Signing material must never live here — keep it outside the repo entirely and
+# pass it to CI as a secret. These patterns are a backstop for an accident, not
+# a place to put things: .gitignore stops `git add -A`, it does not stop
+# `git add -f`, an archive of the directory, or a tool that ignores it.
+*.p12
+*.pfx
+*.key
+*.pem
+*.cer
+*.certSigningRequest
+*.mobileprovision
+*.provisionprofile
+*.keychain
+*.keychain-db
+
 # build/icon.png is a committed source asset, not a build output — electron-builder
 # reads it to generate the .icns and .ico at package time.
