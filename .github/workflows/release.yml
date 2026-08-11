@@ -114,9 +114,11 @@ jobs:
               script="dist:mac:signed"
               echo "Signing with the Developer ID certificate and notarising." >> "$GITHUB_STEP_SUMMARY"
             else
-              # electron-builder would otherwise search the (empty) runner
-              # keychain; after-pack.mjs ad-hoc signs so the build is still
-              # installable, just with the unidentified-developer prompt.
+              # A missing secret arrives as an empty string, not as an unset
+              # variable, and electron-builder treats a *defined* CSC_LINK as
+              # "a certificate was supplied" — then fails resolving "" as a path.
+              # It has to be removed from the environment, not just left blank.
+              unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
               export CSC_IDENTITY_AUTO_DISCOVERY=false
               echo "::warning::No macOS signing credentials — producing an ad-hoc signed, un-notarised build."
             fi

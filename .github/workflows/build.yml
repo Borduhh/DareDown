@@ -87,6 +87,9 @@ jobs:
               script="dist:mac:signed"
               echo "Signing with the Developer ID certificate and notarising." >> "$GITHUB_STEP_SUMMARY"
             else
+              # Empty secrets arrive as empty strings; electron-builder treats a
+              # defined CSC_LINK as a supplied certificate and fails on "".
+              unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
               export CSC_IDENTITY_AUTO_DISCOVERY=false
               echo "::warning::No macOS signing credentials — ad-hoc signed, un-notarised."
             fi
