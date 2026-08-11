@@ -32,6 +32,7 @@
   "main": "src/main/index.js",
   "scripts": {
     "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.renderer.json && tsc -p tsconfig.main.json",
     "icons": "node scripts/make-icons.mjs",
     "dev": "node scripts/build.mjs --watch --electron",
     "start": "npm run build && electron .",
@@ -57,6 +58,7 @@
     "@semantic-release/changelog": "^7.0.0",
     "@semantic-release/exec": "^7.1.0",
     "@semantic-release/git": "^11.0.1",
+    "@types/node": "^26.2.0",
     "conventional-changelog-conventionalcommits": "^8.0.0",
     "electron": "^43.3.0",
     "electron-builder": "^26.15.3",
@@ -68,7 +70,8 @@
     "markdown-it-front-matter": "^0.2.4",
     "markdown-it-task-lists": "^2.1.1",
     "mermaid": "^11.16.1",
-    "semantic-release": "^25.0.9"
+    "semantic-release": "^25.0.9",
+    "typescript": "^7.0.2"
   },
   "build": {
     "appId": "com.borduhh.daredown",

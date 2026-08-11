@@ -3,36 +3,54 @@
  * a list of rows so expansion, keyboard navigation and re-rendering stay cheap.
  */
 
+import type { FolderTree, TreeNode } from '../types/bridge.js';
+
+export interface TreeHandlers {
+  onOpen(path: string): void;
+}
+
+/** A flattened, rendered row — what keyboard navigation actually moves through. */
+interface TreeRow {
+  type: TreeNode['type'];
+  path: string;
+  name: string;
+  depth: number;
+}
+
 export class Tree {
+  private readonly container: HTMLElement;
+  private readonly titleElement: HTMLElement;
+  private readonly handlers: TreeHandlers;
+  private data: FolderTree | null = null;
+  /** Directories the reader has opened. */
+  private readonly expanded = new Set<string>();
+  private activePath: string | null = null;
+  private openPaths = new Set<string>();
+  private rows: TreeRow[] = [];
+
   /**
    * @param {HTMLElement} container
    * @param {HTMLElement} titleElement
    * @param {{ onOpen: (path: string) => void }} handlers
    */
-  constructor(container, titleElement, handlers) {
+  constructor(container: HTMLElement, titleElement: HTMLElement, handlers: TreeHandlers) {
     this.container = container;
     this.titleElement = titleElement;
     this.handlers = handlers;
-    this.data = null;
-    /** Directories the reader has opened. */
-    this.expanded = new Set();
-    this.activePath = null;
-    this.openPaths = new Set();
-    /** @type {Array<{type: string, path: string, name: string, depth: number}>} */
-    this.rows = [];
 
-    this.container.addEventListener('click', (event) => {
-      const node = event.target.closest('[data-path]');
-      if (!node) return;
-      if (node.dataset.type === 'dir') this.toggle(node.dataset.path);
-      else this.handlers.onOpen(node.dataset.path);
+    this.container.addEventListener('click', (event: MouseEvent) => {
+      const node = (event.target as Element | null)?.closest<HTMLElement>('[data-path]');
+      const path = node?.dataset.path;
+      if (!node || !path) return;
+      if (node.dataset.type === 'dir') this.toggle(path);
+      else this.handlers.onOpen(path);
     });
 
-    this.container.addEventListener('keydown', (event) => this.onKeyDown(event));
+    this.container.addEventListener('keydown', (event: KeyboardEvent) => this.onKeyDown(event));
   }
 
   /** Replace the tree, keeping expansion state for folders that still exist. */
-  setData(data) {
+  setData(data: FolderTree | null): void {
     this.data = data;
     if (data) {
       this.titleElement.textContent = data.name || 'Folder';
@@ -52,27 +70,27 @@ export class Tree {
     this.render();
   }
 
-  setActive(path) {
+  setActive(path: string | null): void {
     this.activePath = path;
     this.render();
   }
 
-  setOpenPaths(paths) {
+  setOpenPaths(paths: Iterable<string>): void {
     this.openPaths = new Set(paths);
     this.render();
   }
 
-  toggle(path) {
+  toggle(path: string): void {
     if (this.expanded.has(path)) this.expanded.delete(path);
     else this.expanded.add(path);
     this.render();
   }
 
   /** Open every ancestor folder of `path` so the file becomes visible. */
-  revealPath(path) {
+  revealPath(path: string): void {
     if (!this.data) return;
     let changed = false;
-    const walk = (nodes, ancestors) => {
+    const walk = (nodes: TreeNode[], ancestors: string[]): boolean => {
       for (const node of nodes) {
         if (node.type === 'dir') {
           if (walk(node.children, [...ancestors, node.path])) {
@@ -100,19 +118,20 @@ export class Tree {
   }
 
   /** Every Markdown file in the tree, for quick open. */
-  allFiles() {
-    const files = [];
-    const walk = (nodes) => {
+  allFiles(): TreeRow[] {
+    const files: TreeRow[] = [];
+    const walk = (nodes: TreeNode[]): void => {
       for (const node of nodes) {
         if (node.type === 'dir') walk(node.children);
-        else files.push(node);
+        // Depth is unused by quick open, which shows a flat, searchable list.
+        else files.push({ type: node.type, path: node.path, name: node.name, depth: 0 });
       }
     };
     if (this.data) walk(this.data.children);
     return files;
   }
 
-  render() {
+  render(): void {
     if (!this.data) {
       const empty = document.createElement('div');
       empty.className = 'tree-empty';
@@ -125,7 +144,7 @@ export class Tree {
     this.rows = [];
     const fragment = document.createDocumentFragment();
 
-    const walk = (nodes, depth) => {
+    const walk = (nodes: TreeNode[], depth: number): void => {
       for (const node of nodes) {
         const isDir = node.type === 'dir';
         const expanded = isDir && this.expanded.has(node.path);
@@ -153,7 +172,7 @@ export class Tree {
     this.container.replaceChildren(fragment);
   }
 
-  rowElement(node, depth, expanded) {
+  rowElement(node: TreeNode, depth: number, expanded: boolean): HTMLDivElement {
     const isDir = node.type === 'dir';
     const row = document.createElement('div');
     row.className = `node ${isDir ? 'is-dir' : 'is-file'}`;
@@ -188,16 +207,20 @@ export class Tree {
   }
 
   /** Arrow-key navigation over the flattened row list. */
-  onKeyDown(event) {
+  onKeyDown(event: KeyboardEvent): void {
     const rows = this.rows;
     if (rows.length === 0) return;
 
-    const focused = document.activeElement?.closest?.('.node');
+    const focused = document.activeElement?.closest<HTMLElement>('.node');
     let index = focused ? rows.findIndex((row) => row.path === focused.dataset.path) : -1;
 
-    const focusRow = (target) => {
+    const focusRow = (target: number): void => {
       const clamped = Math.min(rows.length - 1, Math.max(0, target));
-      const element = this.container.querySelector(`[data-path="${cssEscape(rows[clamped].path)}"]`);
+      const row = rows[clamped];
+      if (!row) return;
+      const element = this.container.querySelector<HTMLElement>(
+        `[data-path="${cssEscape(row.path)}"]`
+      );
       element?.focus();
       element?.scrollIntoView({ block: 'nearest' });
     };
@@ -244,7 +267,8 @@ export class Tree {
   }
 }
 
-/** CSS.escape is available in Chromium, but guard for safety. */
-function cssEscape(value) {
-  return window.CSS?.escape ? CSS.escape(value) : value.replace(/["\\]/g, '\\$&');
+// Chromium always provides CSS.escape; the old feature test was dead code —
+// `window.CSS?.escape` is truthy whenever CSS exists, so the fallback never ran.
+function cssEscape(value: string): string {
+  return CSS.escape(value);
 }

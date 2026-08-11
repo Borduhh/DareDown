@@ -34,6 +34,11 @@ jobs:
           --to ${{ github.event.pull_request.head.sha }}
           --verbose
 
+      # esbuild strips types without checking them, so without this step a type
+      # error would ship silently and TypeScript would be buying nothing.
+      - name: Typecheck
+        run: npm run typecheck
+
       # Also asserts that mermaid's lazily-imported diagram modules got inlined;
       # scripts/build.mjs fails the build if any dynamic import() survives.
       - name: Build renderer

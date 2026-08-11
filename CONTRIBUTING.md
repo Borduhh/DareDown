@@ -13,6 +13,46 @@ so explicitly in its pull request:
 - **It stays read-only.** There is no editing surface, and the Markdown a user
   opens is treated as untrusted input.
 
+## TypeScript
+
+The renderer is TypeScript; the main process is JavaScript that is type-checked
+but never compiled.
+
+```bash
+npm run typecheck
+```
+
+That runs two projects rather than one, on purpose:
+
+| Project | Covers | lib |
+|---|---|---|
+| `tsconfig.renderer.json` | `src/renderer`, `src/types` | DOM only |
+| `tsconfig.main.json` | `src/main`, `src/types` | Node + Electron, no DOM |
+
+Splitting them means a Node global referenced in the renderer is a type error
+rather than a runtime crash — the renderer is sandboxed with no Node integration,
+so `require` type-checking there would be a lie. Both run `strict`.
+
+Three things worth knowing before changing any of this:
+
+- **esbuild strips types without checking them.** `npm run build` will happily
+  bundle code that does not type-check, which is why CI runs `typecheck` as its
+  own step. Removing that step silently removes the whole benefit.
+- **`src/types/bridge.ts` is the IPC contract.** `preload.js` is annotated
+  against it, the renderer consumes it, and `dev/harness.js` is checked against
+  it too. Renaming a bridge member now breaks the build in every place that
+  disagrees instead of surfacing as a runtime `undefined`.
+- **`dev/harness.js` stays JavaScript.** `scripts/build.mjs` copies it verbatim
+  rather than bundling it, so TypeScript there would reach the browser
+  untranspiled. It carries JSDoc types instead.
+- **`scripts/` is not type-checked.** Build tooling, where a mistake surfaces the
+  moment you run it, and where esbuild and electron-builder option objects need
+  heavy casting to satisfy their own typings for no safety gained.
+
+The main process stays JavaScript because compiling it would move the Electron
+entry point, the preload path and the `build.files` globs — packaging risk for a
+codebase where JSDoc plus `checkJs` already gives the same checking.
+
 ## Development
 
 ```bash
@@ -37,12 +77,14 @@ src/main/         main process — window, menu, config, watcher, IPC
   files.js          reading documents, walking folders, resolving links
   watcher.js        chokidar wrapper with atomic-save handling
   preload.js        the only renderer↔Node bridge
+src/types/bridge.ts  the IPC contract, shared by preload, renderer and harness
 src/renderer/
-  main.js           app wiring: tabs, sidebar views, commands, live reload, boot
-  markdown.js       markdown-it pipeline, sanitizer, DOM post-pass
-  mermaid-view.js   diagram render, inline zoom, fullscreen pan/zoom
-  mermaid-theme.js  Mermaid themeVariables derived from the palette
-  tabs.js tree.js outline.js find.js overlays.js toast.js
+  main.ts           app wiring: tabs, sidebar views, commands, live reload, boot
+  markdown.ts       markdown-it pipeline, sanitizer, DOM post-pass
+  mermaid-view.ts   diagram render, inline zoom, fullscreen pan/zoom
+  mermaid-theme.ts  Mermaid themeVariables derived from the palette
+  tabs.ts tree.ts outline.ts find.ts overlays.ts toast.ts
+  dev/harness.js    stub IPC bridge; stays JS, copied verbatim by the build
   styles/           tokens, shell, sidebar, prose, code, mermaid, overlays
 build/icon.png      the app icon, source asset for .icns and .ico
 scripts/build.mjs   esbuild bundle + harness generator

@@ -13,6 +13,7 @@ const isMac = process.platform === 'darwin';
  * @param {{ onCommand: (command: string, arg?: unknown) => void }} handlers
  */
 function buildMenu(handlers) {
+  /** @param {string} command @param {unknown} [arg] */
   const send = (command, arg) => ({
     click: () => handlers.onCommand(command, arg),
   });
@@ -48,7 +49,7 @@ function buildMenu(handlers) {
       { type: 'separator' },
       { label: 'Close Tab', accelerator: 'CmdOrCtrl+W', ...send('tab:close') },
       { label: 'Close Folder', ...send('folder:close') },
-      ...(isMac
+      .../** @type {Electron.MenuItemConstructorOptions[]} */ (isMac
         ? []
         : [
             { type: 'separator' },
@@ -90,7 +91,9 @@ function buildMenu(handlers) {
       { label: 'Wider Column', accelerator: 'CmdOrCtrl+]', ...send('width:wider') },
       { type: 'separator' },
       { role: 'togglefullscreen' },
-      ...(process.env.DAREDOWN_DEBUG ? [{ role: 'toggleDevTools' }] : []),
+      .../** @type {Electron.MenuItemConstructorOptions[]} */ (
+        process.env.DAREDOWN_DEBUG ? [{ role: 'toggleDevTools' }] : []
+      ),
     ],
   });
 

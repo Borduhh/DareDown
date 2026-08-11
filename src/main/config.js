@@ -9,6 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { app } = require('electron');
 
+/** @type {import('../types/bridge.js').Config} */
 const DEFAULTS = {
   window: { width: 1120, height: 800, x: null, y: null, maximized: false },
   theme: 'system', // 'system' | 'light' | 'dark'
@@ -30,8 +31,13 @@ const CLAMPS = {
   sidebarWidth: [180, 480],
 };
 
+/** @typedef {import('../types/bridge.js').Config} Config */
+
+/** @type {string | null} */
 let filePath = null;
+/** @type {Config | null} */
 let cache = null;
+/** @type {ReturnType<typeof setTimeout> | null} */
 let writeTimer = null;
 
 function configPath() {
@@ -39,15 +45,25 @@ function configPath() {
   return filePath;
 }
 
+/**
+ * @param {keyof typeof CLAMPS | string} key
+ * @param {unknown} value
+ * @param {number} fallback
+ */
 function clampNumber(key, value, fallback) {
-  const range = CLAMPS[key];
+  const range = /** @type {Record<string, number[] | undefined>} */ (CLAMPS)[key];
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   if (!range) return n;
   return Math.min(range[1], Math.max(range[0], n));
 }
 
-/** Merge stored values over defaults, dropping anything malformed. */
+/**
+ * Merge stored values over defaults, dropping anything malformed.
+ *
+ * @param {any} raw
+ * @returns {Config}
+ */
 function sanitize(raw) {
   const out = structuredClone(DEFAULTS);
   if (!raw || typeof raw !== 'object') return out;
@@ -66,34 +82,42 @@ function sanitize(raw) {
   out.readingWidth = clampNumber('readingWidth', raw.readingWidth, DEFAULTS.readingWidth);
   out.fontSize = clampNumber('fontSize', raw.fontSize, DEFAULTS.fontSize);
   out.sidebarWidth = clampNumber('sidebarWidth', raw.sidebarWidth, DEFAULTS.sidebarWidth);
-  for (const flag of ['sidebarVisible', 'fullWidth', 'wrapCode']) {
+  for (const flag of /** @type {const} */ (['sidebarVisible', 'fullWidth', 'wrapCode'])) {
     if (typeof raw[flag] === 'boolean') out[flag] = raw[flag];
   }
   if (['files', 'outline'].includes(raw.sidebarPane)) out.sidebarPane = raw.sidebarPane;
   if (typeof raw.lastFolder === 'string') out.lastFolder = raw.lastFolder;
   if (typeof raw.activeFile === 'string') out.activeFile = raw.activeFile;
   if (Array.isArray(raw.lastFiles)) {
-    out.lastFiles = raw.lastFiles.filter((p) => typeof p === 'string').slice(0, 40);
+    out.lastFiles = raw.lastFiles.filter((/** @type {unknown} */ p) => typeof p === 'string').slice(0, 40);
   }
   return out;
 }
 
 function load() {
   if (cache) return cache;
+  /** @type {Config} */
+  let loaded;
   try {
-    cache = sanitize(JSON.parse(fs.readFileSync(configPath(), 'utf8')));
+    loaded = sanitize(JSON.parse(fs.readFileSync(configPath(), 'utf8')));
   } catch {
     // Missing or corrupt config is not an error — fall back to defaults.
-    cache = structuredClone(DEFAULTS);
+    loaded = structuredClone(DEFAULTS);
   }
-  return cache;
+  cache = loaded;
+  return loaded;
 }
 
 function get() {
   return structuredClone(load());
 }
 
-/** Shallow-merge a patch into the config and schedule a debounced write. */
+/**
+ * Shallow-merge a patch into the config and schedule a debounced write.
+ *
+ * @param {Partial<Config>} patch
+ * @returns {Config}
+ */
 function set(patch) {
   const current = load();
   cache = sanitize({ ...current, ...patch });
@@ -120,7 +144,7 @@ function flush() {
     fs.writeFileSync(tmp, `${JSON.stringify(cache, null, 2)}\n`, 'utf8');
     fs.renameSync(tmp, target);
   } catch (err) {
-    console.error('[config] could not save preferences:', err.message);
+    console.error('[config] could not save preferences:', err instanceof Error ? err.message : err);
     try {
       fs.rmSync(tmp, { force: true });
     } catch {}

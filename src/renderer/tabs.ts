@@ -3,34 +3,50 @@
  * want back when the reader returns to it — scroll offset above all.
  */
 
+export interface Tab {
+  path: string;
+  name: string;
+  scrollTop: number;
+  missing: boolean;
+}
+
+export interface TabsHandlers {
+  onActivate(path: string): void;
+  onClose(path: string): void;
+}
+
 export class Tabs {
+  private readonly strip: HTMLElement;
+  private readonly handlers: TabsHandlers;
+  private readonly items = new Map<string, Tab>();
+  activePath: string | null = null;
+
   /**
    * @param {HTMLElement} strip
    * @param {{ onActivate: (path: string) => void, onClose: (path: string) => void }} handlers
    */
-  constructor(strip, handlers) {
+  constructor(strip: HTMLElement, handlers: TabsHandlers) {
     this.strip = strip;
     this.handlers = handlers;
-    /** @type {Map<string, {path: string, name: string, scrollTop: number, missing: boolean}>} */
-    this.items = new Map();
-    this.activePath = null;
 
-    this.strip.addEventListener('click', (event) => {
-      const close = event.target.closest('[data-close]');
+    this.strip.addEventListener('click', (event: MouseEvent) => {
+      const target = event.target as Element | null;
+      const close = target?.closest('[data-close]');
       if (close) {
         event.stopPropagation();
-        this.handlers.onClose(close.closest('[data-path]').dataset.path);
+        const owner = close.closest<HTMLElement>('[data-path]');
+        if (owner?.dataset.path) this.handlers.onClose(owner.dataset.path);
         return;
       }
-      const tab = event.target.closest('[data-path]');
-      if (tab) this.handlers.onActivate(tab.dataset.path);
+      const tab = target?.closest<HTMLElement>('[data-path]');
+      if (tab?.dataset.path) this.handlers.onActivate(tab.dataset.path);
     });
 
     // Middle-click closes, as it does in every other tabbed app.
-    this.strip.addEventListener('auxclick', (event) => {
+    this.strip.addEventListener('auxclick', (event: MouseEvent) => {
       if (event.button !== 1) return;
-      const tab = event.target.closest('[data-path]');
-      if (tab) {
+      const tab = (event.target as Element | null)?.closest<HTMLElement>('[data-path]');
+      if (tab?.dataset.path) {
         event.preventDefault();
         this.handlers.onClose(tab.dataset.path);
       }
@@ -39,7 +55,7 @@ export class Tabs {
     // Let a horizontal-less mouse wheel move through the strip.
     this.strip.addEventListener(
       'wheel',
-      (event) => {
+      (event: WheelEvent) => {
         if (event.deltaX !== 0 || this.strip.scrollWidth <= this.strip.clientWidth) return;
         event.preventDefault();
         this.strip.scrollLeft += event.deltaY;
@@ -48,43 +64,44 @@ export class Tabs {
     );
   }
 
-  get paths() {
+  get paths(): string[] {
     return [...this.items.keys()];
   }
 
-  get count() {
+  get count(): number {
     return this.items.size;
   }
 
-  has(path) {
+  has(path: string): boolean {
     return this.items.has(path);
   }
 
-  get(path) {
+  get(path: string): Tab | undefined {
     return this.items.get(path);
   }
 
-  get active() {
-    return this.activePath ? this.items.get(this.activePath) : null;
+  get active(): Tab | null {
+    return (this.activePath ? this.items.get(this.activePath) : null) ?? null;
   }
 
   /** Add a tab if absent; returns the record either way. */
-  add(path, name) {
-    if (!this.items.has(path)) {
-      this.items.set(path, { path, name, scrollTop: 0, missing: false });
-      this.render();
-    }
-    return this.items.get(path);
+  add(path: string, name: string): Tab {
+    const existing = this.items.get(path);
+    if (existing) return existing;
+    const tab: Tab = { path, name, scrollTop: 0, missing: false };
+    this.items.set(path, tab);
+    this.render();
+    return tab;
   }
 
-  setActive(path) {
-    this.activePath = this.items.has(path) ? path : null;
+  setActive(path: string | null): void {
+    this.activePath = path !== null && this.items.has(path) ? path : null;
     this.render();
     this.scrollActiveIntoView();
   }
 
   /** Remove a tab and return the path that should be shown next, if any. */
-  remove(path) {
+  remove(path: string): string | null {
     if (!this.items.has(path)) return null;
     const order = this.paths;
     const index = order.indexOf(path);
@@ -100,34 +117,35 @@ export class Tabs {
     return next;
   }
 
-  closeAll() {
+  closeAll(): void {
     this.items.clear();
     this.activePath = null;
     this.render();
   }
 
   /** Step through tabs, wrapping at both ends. */
-  neighbour(offset) {
+  neighbour(offset: number): string | null {
     const order = this.paths;
     if (order.length === 0) return null;
-    const index = order.indexOf(this.activePath);
-    return order[(index + offset + order.length) % order.length];
+    // With nothing active this stays -1, so a +1 step lands on the first tab.
+    const index = this.activePath === null ? -1 : order.indexOf(this.activePath);
+    return order[(index + offset + order.length) % order.length] ?? null;
   }
 
-  markMissing(path, missing) {
+  markMissing(path: string, missing: boolean): void {
     const item = this.items.get(path);
     if (!item || item.missing === missing) return;
     item.missing = missing;
     this.render();
   }
 
-  saveScroll(path, scrollTop) {
+  saveScroll(path: string, scrollTop: number): void {
     const item = this.items.get(path);
     if (item) item.scrollTop = scrollTop;
   }
 
   /** Rename a tab when the file on disk moved. */
-  rename(oldPath, newPath, name) {
+  rename(oldPath: string, newPath: string, name: string): void {
     if (!this.items.has(oldPath)) return;
     const entries = [...this.items.entries()];
     this.items.clear();
@@ -142,7 +160,7 @@ export class Tabs {
     this.render();
   }
 
-  render() {
+  render(): void {
     const fragment = document.createDocumentFragment();
 
     for (const item of this.items.values()) {

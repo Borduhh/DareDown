@@ -21,11 +21,16 @@ const MAX_DEPTH = 12;
 const MAX_ENTRIES = 8000;
 const MAX_FILE_BYTES = 32 * 1024 * 1024;
 
+/** @param {string} filePath */
 function isMarkdown(filePath) {
   return MARKDOWN_EXTENSIONS.has(path.extname(filePath).toLowerCase());
 }
 
 /** Read a Markdown file, returning its text plus the stat info we watch on. */
+/**
+ * @param {string} filePath
+ * @returns {Promise<import('../types/bridge.js').MarkdownDocument>}
+ */
 async function readMarkdown(filePath) {
   const abs = path.resolve(filePath);
   const stat = await fs.stat(abs);
@@ -50,6 +55,10 @@ async function readMarkdown(filePath) {
  * files. Folders with no Markdown anywhere beneath them are pruned so the
  * sidebar stays a document outline rather than a file browser.
  */
+/**
+ * @param {string} root
+ * @returns {Promise<import('../types/bridge.js').FolderTree>}
+ */
 async function readTree(root) {
   const absRoot = path.resolve(root);
   const budget = { entries: 0, truncated: false };
@@ -62,6 +71,12 @@ async function readTree(root) {
   };
 }
 
+/**
+ * @param {string} dir
+ * @param {number} depth
+ * @param {{entries: number, truncated: boolean}} budget
+ * @returns {Promise<import('../types/bridge.js').TreeDirectory | null>}
+ */
 async function walk(dir, depth, budget) {
   if (depth > MAX_DEPTH) {
     budget.truncated = true;
@@ -74,7 +89,9 @@ async function walk(dir, depth, budget) {
     return null; // unreadable directory — skip quietly
   }
 
+  /** @type {import('../types/bridge.js').TreeDirectory[]} */
   const folders = [];
+  /** @type {import('../types/bridge.js').TreeFile[]} */
   const files = [];
   for (const entry of entries) {
     if (budget.entries >= MAX_ENTRIES) {
@@ -107,6 +124,11 @@ async function walk(dir, depth, budget) {
  * appending a default extension when the link omits one (a common convention
  * in wikis and docs sites). Returns null when nothing on disk matches.
  */
+/**
+ * @param {string} fromFile
+ * @param {string} href
+ * @returns {Promise<string | null>}
+ */
 async function resolveLink(fromFile, href) {
   const baseDir = path.dirname(path.resolve(fromFile));
   const decoded = safeDecode(href.replace(/[?#].*$/, ''));
@@ -128,6 +150,7 @@ async function resolveLink(fromFile, href) {
   return null;
 }
 
+/** @param {string} value */
 function safeDecode(value) {
   try {
     return decodeURIComponent(value);

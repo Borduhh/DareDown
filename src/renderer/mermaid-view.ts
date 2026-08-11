@@ -15,12 +15,38 @@
 import mermaid from 'mermaid';
 import { mermaidConfig } from './mermaid-theme.js';
 
+/** A diagram block, with the state we hang off it once rendered. */
+interface MermaidBlockElement extends HTMLElement {
+  __mermaid?: DiagramState | null;
+}
+
+interface Size {
+  w: number;
+  h: number;
+}
+
+interface DiagramState {
+  block: MermaidBlockElement;
+  frame: HTMLElement;
+  canvas: HTMLElement;
+  svg: SVGSVGElement;
+  natural: Size;
+  source: string;
+  label: string;
+  /** Current inline zoom, relative to the diagram's natural size. */
+  scale: number;
+  /** The scale at which it just fits the frame; what reset returns to. */
+  fitScale: number;
+  zoomLabel: HTMLElement;
+  buttons: { out: HTMLButtonElement; in: HTMLButtonElement; reset: HTMLButtonElement };
+}
+
 const MIN_SCALE = 0.25;
 const MAX_SCALE = 4;
 const STEP = 1.25;
 
 /** Human labels for the diagram-type footer. */
-const DIAGRAM_LABELS = [
+const DIAGRAM_LABELS: Array<[RegExp, string]> = [
   [/^(graph|flowchart)\b/i, 'Flowchart'],
   [/^sequenceDiagram\b/i, 'Sequence'],
   [/^classDiagram(-v2)?\b/i, 'Class'],
@@ -46,13 +72,13 @@ const DIAGRAM_LABELS = [
   [/^zenuml\b/i, 'ZenUML'],
 ];
 
-function diagramLabel(source) {
+function diagramLabel(source: string): string {
   // Skip front-matter, directives and comments to find the type keyword.
   const body = source
     .replace(/^---[\s\S]*?---\s*/m, '')
     .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith('%%'))
+    .map((line: string) => line.trim())
+    .filter((line: string) => line && !line.startsWith('%%'))
     .join('\n');
   for (const [pattern, label] of DIAGRAM_LABELS) {
     if (pattern.test(body)) return label;
@@ -65,7 +91,7 @@ let currentIsDark = false;
 let initialized = false;
 
 /** (Re)configure mermaid for a theme. Diagrams must be re-rendered after. */
-export function configureMermaid(isDark) {
+export function configureMermaid(isDark: boolean): void {
   currentIsDark = Boolean(isDark);
   mermaid.initialize(mermaidConfig(currentIsDark));
   initialized = true;
@@ -83,7 +109,12 @@ const ICONS = {
   close: '<line x1="4.6" y1="4.6" x2="15.4" y2="15.4"/><line x1="15.4" y1="4.6" x2="4.6" y2="15.4"/>',
 };
 
-function iconButton(icon, title, action, { text = '' } = {}) {
+function iconButton(
+  icon: string | null,
+  title: string,
+  action: string,
+  { text = '' }: { text?: string } = {}
+): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = text ? 'mmd-btn text' : 'mmd-btn';
@@ -99,18 +130,18 @@ function iconButton(icon, title, action, { text = '' } = {}) {
  * Rendering
  * ------------------------------------------------------------------ */
 
-function clamp(value, min = MIN_SCALE, max = MAX_SCALE) {
+function clamp(value: number, min = MIN_SCALE, max = MAX_SCALE): number {
   return Math.min(max, Math.max(min, value));
 }
 
 /** Natural (unscaled) diagram size, from the viewBox where available. */
-function naturalSize(svg) {
+function naturalSize(svg: SVGSVGElement): Size {
   const box = svg.viewBox?.baseVal;
   if (box && box.width > 1 && box.height > 1) {
     return { w: box.width, h: box.height };
   }
-  const width = parseFloat(svg.getAttribute('width'));
-  const height = parseFloat(svg.getAttribute('height'));
+  const width = parseFloat(svg.getAttribute('width') ?? '');
+  const height = parseFloat(svg.getAttribute('height') ?? '');
   if (Number.isFinite(width) && Number.isFinite(height) && width > 1) {
     return { w: width, h: height };
   }
@@ -126,8 +157,11 @@ function naturalSize(svg) {
  *        zoomMemory maps diagram source → inline scale, so a live-reload or a
  *        theme flip does not throw away the zoom the reader had set.
  */
-export async function renderMermaidBlocks(root, { zoomMemory } = {}) {
-  const blocks = [...root.querySelectorAll('.mermaid-block[data-state="pending"]')];
+export async function renderMermaidBlocks(
+  root: HTMLElement,
+  { zoomMemory }: { zoomMemory?: Map<string, number> } = {}
+): Promise<void> {
+  const blocks = [...root.querySelectorAll<MermaidBlockElement>('.mermaid-block[data-state="pending"]')];
   if (blocks.length === 0) return;
   if (!initialized) configureMermaid(currentIsDark);
 
@@ -155,7 +189,7 @@ export async function renderMermaidBlocks(root, { zoomMemory } = {}) {
  * on "Rendering…" until the window came back. Racing a timer keeps the queue
  * moving while still aligning with paint when the window is visible.
  */
-function yieldToPaint() {
+function yieldToPaint(): Promise<void> {
   return new Promise((resolve) => {
     let settled = false;
     const finish = () => {
@@ -168,7 +202,11 @@ function yieldToPaint() {
   });
 }
 
-async function renderOne(block, source, zoomMemory) {
+async function renderOne(
+  block: MermaidBlockElement,
+  source: string,
+  zoomMemory?: Map<string, number>
+): Promise<void> {
   const id = `daredown-mmd-${(idCounter += 1)}`;
   let svgText;
 
@@ -191,13 +229,14 @@ async function renderOne(block, source, zoomMemory) {
   mount(block, source, svgText, zoomMemory);
 }
 
-function cleanErrorMessage(err) {
-  const message = String(err?.message || err || 'Unknown error').trim();
+function cleanErrorMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : err;
+  const message = String(raw || 'Unknown error').trim();
   // Mermaid prefixes parse failures with a long grammar dump; keep the useful part.
   return message.replace(/^Parse error on line/, 'Parse error, line').slice(0, 800);
 }
 
-function renderError(block, message, source) {
+function renderError(block: HTMLElement, message: string, source: string): void {
   const wrap = document.createElement('div');
   wrap.className = 'mermaid-error';
 
@@ -225,7 +264,12 @@ function renderError(block, message, source) {
 }
 
 /** Build the frame, controls and footer around a freshly rendered SVG. */
-function mount(block, source, svgText, zoomMemory) {
+function mount(
+  block: MermaidBlockElement,
+  source: string,
+  svgText: string,
+  zoomMemory?: Map<string, number>
+): void {
   const frame = document.createElement('div');
   frame.className = 'mermaid-frame';
 
@@ -282,7 +326,7 @@ function mount(block, source, svgText, zoomMemory) {
   const natural = naturalSize(svg);
   svg.setAttribute('aria-label', `${label} diagram`);
 
-  const state = {
+  const state: DiagramState = {
     block,
     frame,
     canvas,
@@ -301,8 +345,9 @@ function mount(block, source, svgText, zoomMemory) {
   const remembered = zoomMemory?.get(source);
   setInlineScale(state, remembered ?? state.fitScale);
 
-  controls.addEventListener('click', (event) => {
-    const action = event.target.closest('[data-action]')?.dataset.action;
+  controls.addEventListener('click', (event: MouseEvent) => {
+    const action = (event.target as Element | null)?.closest<HTMLElement>('[data-action]')?.dataset
+      .action;
     if (!action) return;
     event.stopPropagation();
     if (action === 'in') setInlineScale(state, state.scale * STEP);
@@ -331,13 +376,13 @@ function mount(block, source, svgText, zoomMemory) {
 }
 
 /** Scale at which the diagram just fits the frame's content width. */
-function computeFitScale(state) {
+function computeFitScale(state: DiagramState): number {
   const available = state.frame.clientWidth - 36; // frame padding
   if (available <= 0 || state.natural.w <= 0) return 1;
   return clamp(Math.min(1, available / state.natural.w), MIN_SCALE, 1);
 }
 
-function setInlineScale(state, next) {
+function setInlineScale(state: DiagramState, next: number): void {
   const scale = clamp(next);
   state.scale = scale;
   state.svg.style.width = `${Math.round(state.natural.w * scale)}px`;
@@ -354,8 +399,8 @@ function setInlineScale(state, next) {
  * Recompute fit scales after a layout change (window resize, reading-width
  * change). Diagrams the reader has zoomed manually are left alone.
  */
-export function refitMermaidBlocks(root) {
-  for (const block of root.querySelectorAll('.mermaid-block[data-state="ok"]')) {
+export function refitMermaidBlocks(root: HTMLElement): void {
+  for (const block of root.querySelectorAll<MermaidBlockElement>('.mermaid-block[data-state="ok"]')) {
     const state = block.__mermaid;
     if (!state) continue;
     const wasAtFit = Math.abs(state.scale - state.fitScale) < 0.005;
@@ -365,9 +410,9 @@ export function refitMermaidBlocks(root) {
 }
 
 /** Snapshot inline zoom levels keyed by diagram source, for re-render. */
-export function captureMermaidZoom(root) {
+export function captureMermaidZoom(root: HTMLElement): Map<string, number> {
   const memory = new Map();
-  for (const block of root.querySelectorAll('.mermaid-block[data-state="ok"]')) {
+  for (const block of root.querySelectorAll<MermaidBlockElement>('.mermaid-block[data-state="ok"]')) {
     const state = block.__mermaid;
     // Only remember deliberate zoom; a fitted diagram should re-fit next time.
     if (state && Math.abs(state.scale - state.fitScale) > 0.005) {
@@ -378,8 +423,8 @@ export function captureMermaidZoom(root) {
 }
 
 /** Reset every block to pending so the next render pass redraws it. */
-export function resetMermaidBlocks(root) {
-  for (const block of root.querySelectorAll('.mermaid-block')) {
+export function resetMermaidBlocks(root: HTMLElement): void {
+  for (const block of root.querySelectorAll<MermaidBlockElement>('.mermaid-block')) {
     const source = block.querySelector('.mermaid-source')?.textContent ?? '';
     block.__mermaid = null;
     block.dataset.state = 'pending';
@@ -396,17 +441,17 @@ export function resetMermaidBlocks(root) {
  * ------------------------------------------------------------------ */
 
 /** @type {null | { close: () => void }} */
-let activeModal = null;
+let activeModal: { close: () => void } | null = null;
 
-export function isMermaidModalOpen() {
+export function isMermaidModalOpen(): boolean {
   return activeModal !== null;
 }
 
-export function closeMermaidModal() {
+export function closeMermaidModal(): void {
   activeModal?.close();
 }
 
-function openFullscreen(state) {
+function openFullscreen(state: DiagramState): void {
   if (activeModal) activeModal.close();
 
   const previousFocus = document.activeElement;
@@ -474,7 +519,7 @@ function openFullscreen(state) {
   const view = { scale: 1, tx: 0, ty: 0 };
   let fit = { scale: 1, tx: 0, ty: 0 };
 
-  function apply() {
+  function apply(): void {
     viewport.style.transform = `translate(${view.tx}px, ${view.ty}px) scale(${view.scale})`;
     zoomLabel.textContent = `${Math.round(view.scale * 100)}%`;
     btnIn.disabled = view.scale >= MAX_SCALE - 0.001;
@@ -482,7 +527,7 @@ function openFullscreen(state) {
   }
 
   /** Centre the diagram in the stage at the largest scale that fits. */
-  function computeFit() {
+  function computeFit(): { scale: number; tx: number; ty: number } {
     const rect = stage.getBoundingClientRect();
     const pad = 48;
     const scale = clamp(
@@ -499,7 +544,7 @@ function openFullscreen(state) {
     return fit;
   }
 
-  function reset() {
+  function reset(): void {
     const target = computeFit();
     view.scale = target.scale;
     view.tx = target.tx;
@@ -508,7 +553,7 @@ function openFullscreen(state) {
   }
 
   /** Zoom by `factor`, keeping the point (px, py) in stage space fixed. */
-  function zoomAt(px, py, factor) {
+  function zoomAt(px: number, py: number, factor: number): void {
     const next = clamp(view.scale * factor);
     if (next === view.scale) return;
     const ratio = next / view.scale;
@@ -518,12 +563,12 @@ function openFullscreen(state) {
     apply();
   }
 
-  function zoomCentre(factor) {
+  function zoomCentre(factor: number): void {
     const rect = stage.getBoundingClientRect();
     zoomAt(rect.width / 2, rect.height / 2, factor);
   }
 
-  function stagePoint(event) {
+  function stagePoint(event: { clientX: number; clientY: number }): { x: number; y: number } {
     const rect = stage.getBoundingClientRect();
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   }
@@ -531,10 +576,10 @@ function openFullscreen(state) {
   /* ---- pointer panning and touch pinch ------------------------------- */
 
   const pointers = new Map();
-  let pinch = null;
+  let pinch: { distance: number; scale: number; midpoint: { x: number; y: number } } | null = null;
   let dragged = false;
 
-  stage.addEventListener('pointerdown', (event) => {
+  stage.addEventListener('pointerdown', (event: PointerEvent) => {
     if (event.button !== 0) return;
     stage.setPointerCapture(event.pointerId);
     pointers.set(event.pointerId, stagePoint(event));
@@ -552,7 +597,7 @@ function openFullscreen(state) {
     hints.classList.add('is-faded');
   });
 
-  stage.addEventListener('pointermove', (event) => {
+  stage.addEventListener('pointermove', (event: PointerEvent) => {
     if (!pointers.has(event.pointerId)) return;
     const previous = pointers.get(event.pointerId);
     const current = stagePoint(event);
@@ -583,7 +628,7 @@ function openFullscreen(state) {
     apply();
   });
 
-  function endPointer(event) {
+  function endPointer(event: PointerEvent): void {
     pointers.delete(event.pointerId);
     if (pointers.size < 2) pinch = null;
     if (pointers.size === 0) stage.classList.remove('is-panning');
@@ -608,15 +653,16 @@ function openFullscreen(state) {
     { passive: false }
   );
 
-  stage.addEventListener('dblclick', (event) => {
+  stage.addEventListener('dblclick', (event: MouseEvent) => {
     const { x, y } = stagePoint(event);
     zoomAt(x, y, event.altKey ? 1 / 1.8 : 1.8);
   });
 
   /* ---- controls, scrim, keyboard ------------------------------------- */
 
-  actions.addEventListener('click', (event) => {
-    const action = event.target.closest('[data-action]')?.dataset.action;
+  actions.addEventListener('click', (event: MouseEvent) => {
+    const action = (event.target as Element | null)?.closest<HTMLElement>('[data-action]')?.dataset
+      .action;
     if (!action) return;
     if (action === 'in') zoomCentre(STEP);
     else if (action === 'out') zoomCentre(1 / STEP);
@@ -630,7 +676,7 @@ function openFullscreen(state) {
     if (!dragged) close();
   });
 
-  function onKeyDown(event) {
+  function onKeyDown(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
@@ -654,12 +700,14 @@ function openFullscreen(state) {
       apply();
     } else if (event.key === 'Tab') {
       // Keep focus inside the dialog.
-      const focusable = [...panel.querySelectorAll('button:not(:disabled)')];
+      const focusable = [...panel.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
       if (focusable.length === 0) return;
-      const index = focusable.indexOf(document.activeElement);
+      const active = document.activeElement;
+      // -1 when focus is elsewhere, so a forward Tab lands on the first button.
+      const index = active instanceof HTMLButtonElement ? focusable.indexOf(active) : -1;
       event.preventDefault();
       const next = event.shiftKey ? index - 1 : index + 1;
-      focusable[(next + focusable.length) % focusable.length].focus();
+      focusable[(next + focusable.length) % focusable.length]?.focus();
     }
   }
   // Capture phase so the app's global shortcuts never see these keys.
@@ -672,7 +720,7 @@ function openFullscreen(state) {
   window.addEventListener('resize', onResize);
 
   let closed = false;
-  function close() {
+  function close(): void {
     if (closed) return;
     closed = true;
     document.removeEventListener('keydown', onKeyDown, true);
@@ -712,7 +760,7 @@ function openFullscreen(state) {
 }
 
 /** Normalize wheel deltas across line/page/pixel modes. */
-function normalizeDelta(event) {
+function normalizeDelta(event: WheelEvent): number {
   const { deltaY, deltaMode } = event;
   if (deltaMode === 1) return deltaY * 16; // lines
   if (deltaMode === 2) return deltaY * 400; // pages

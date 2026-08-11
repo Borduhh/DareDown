@@ -5,45 +5,62 @@
  */
 const { contextBridge, ipcRenderer } = require('electron');
 
-/** Wrap a main-process listener so callers get an unsubscribe function. */
+/**
+ * Wrap a main-process listener so callers get an unsubscribe function.
+ *
+ * @param {string} channel
+ * @param {(payload: any) => void} handler
+ * @returns {() => void}
+ */
 function on(channel, handler) {
+  /** @type {(event: Electron.IpcRendererEvent, payload: any) => void} */
   const listener = (_event, payload) => handler(payload);
   ipcRenderer.on(channel, listener);
-  return () => ipcRenderer.off(channel, listener);
+  return () => {
+    ipcRenderer.off(channel, listener);
+  };
 }
 
-contextBridge.exposeInMainWorld('daredown', {
+/**
+ * The shape here is the contract in src/types/bridge.ts. Annotating it means a
+ * member renamed on one side stops type-checking on the other.
+ *
+ * @type {import('../types/bridge.js').DareDownApi}
+ */
+const api = {
   platform: process.platform,
 
   // ---- documents -------------------------------------------------------
-  readFile: (filePath) => ipcRenderer.invoke('file:read', filePath),
-  readTree: (folder) => ipcRenderer.invoke('folder:tree', folder),
-  resolveLink: (fromFile, href) => ipcRenderer.invoke('link:resolve', { fromFile, href }),
-  pathInfo: (filePath) => ipcRenderer.invoke('path:info', filePath),
+  readFile: (/** @type {string} */ filePath) => ipcRenderer.invoke('file:read', filePath),
+  readTree: (/** @type {string} */ folder) => ipcRenderer.invoke('folder:tree', folder),
+  resolveLink: (/** @type {string} */ fromFile, /** @type {string} */ href) => ipcRenderer.invoke('link:resolve', { fromFile, href }),
+  pathInfo: (/** @type {string} */ filePath) => ipcRenderer.invoke('path:info', filePath),
 
   // ---- dialogs & shell -------------------------------------------------
   openFileDialog: () => ipcRenderer.invoke('dialog:open-file'),
   openFolderDialog: () => ipcRenderer.invoke('dialog:open-folder'),
-  openExternal: (url) => ipcRenderer.invoke('shell:open-external', url),
-  revealInFolder: (filePath) => ipcRenderer.invoke('shell:reveal', filePath),
+  openExternal: (/** @type {string} */ url) => ipcRenderer.invoke('shell:open-external', url),
+  revealInFolder: (/** @type {string} */ filePath) => ipcRenderer.invoke('shell:reveal', filePath),
 
   // ---- preferences -----------------------------------------------------
   getConfig: () => ipcRenderer.invoke('config:get'),
-  setConfig: (patch) => ipcRenderer.invoke('config:set', patch),
-  setThemeSource: (source) => ipcRenderer.invoke('theme:set-source', source),
+  setConfig: (/** @type {any} */ patch) => ipcRenderer.invoke('config:set', patch),
+  setThemeSource: (/** @type {any} */ source) => ipcRenderer.invoke('theme:set-source', source),
 
   // ---- live reload -----------------------------------------------------
-  watch: (payload) => ipcRenderer.invoke('watch:set', payload),
+  watch: (/** @type {any} */ payload) => ipcRenderer.invoke('watch:set', payload),
 
   // ---- events from main ------------------------------------------------
-  onFileChanged: (handler) => on('file:changed', handler),
-  onFileRemoved: (handler) => on('file:removed', handler),
-  onTreeChanged: (handler) => on('tree:changed', handler),
-  onNativeThemeChanged: (handler) => on('theme:native-changed', handler),
-  onMenuCommand: (handler) => on('menu:command', handler),
-  onOpenPaths: (handler) => on('app:open-paths', handler),
+  onFileChanged: (/** @type {any} */ handler) => on('file:changed', handler),
+  onFileRemoved: (/** @type {any} */ handler) => on('file:removed', handler),
+  onTreeChanged: (/** @type {any} */ handler) => on('tree:changed', handler),
+  onNativeThemeChanged: (/** @type {any} */ handler) => on('theme:native-changed', handler),
+  onMenuCommand: (/** @type {any} */ handler) => on('menu:command', handler),
+  onOpenPaths: (/** @type {any} */ handler) => on('app:open-paths', handler),
 
   // ---- lifecycle -------------------------------------------------------
   /** Renderer tells main it is ready so queued file-open requests can flush. */
   ready: () => ipcRenderer.invoke('app:renderer-ready'),
-});
+};
+
+contextBridge.exposeInMainWorld('daredown', api);

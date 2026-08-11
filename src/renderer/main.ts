@@ -5,6 +5,7 @@
  * reload together. All filesystem and OS access goes through `window.daredown`,
  * the narrow bridge defined in src/main/preload.js.
  */
+// @ts-expect-error — esbuild handles the CSS import; there is no module to type.
 import './styles/index.css';
 
 import { renderMarkdown } from './markdown.js';
@@ -24,47 +25,59 @@ import { Find } from './find.js';
 import { openPreferences, openQuickOpen, openShortcuts } from './overlays.js';
 import { toast } from './toast.js';
 
+import type { Config, ConfigPatch, MarkdownDocument, SidebarPane } from '../types/bridge.js';
+
 const api = window.daredown;
 
 /** GitHub Sponsors page, opened in the OS browser from the sidebar footer. */
 const SPONSOR_URL = 'https://github.com/sponsors/Borduhh';
 
-const el = {
-  app: document.getElementById('app'),
-  topbar: document.getElementById('topbar'),
-  crumbs: document.getElementById('crumbs'),
-  progress: document.querySelector('#progress i'),
-  sidebar: document.getElementById('sidebar'),
-  sidebarTabs: document.querySelector('.sidebar-tabs'),
-  sidebarTitle: document.getElementById('sidebar-title'),
-  sidebarGrip: document.getElementById('sidebar-grip'),
-  tree: document.getElementById('tree'),
-  main: document.getElementById('main'),
-  tabstrip: document.getElementById('tabstrip'),
-  scroller: document.getElementById('scroller'),
-  doc: document.getElementById('doc'),
-  welcome: document.getElementById('welcome'),
-  outlineList: document.getElementById('outline-list'),
-  btnSidebar: document.getElementById('btn-sidebar'),
-  btnFullWidth: document.getElementById('btn-full-width'),
-  btnTheme: document.getElementById('btn-theme'),
-  btnPrefs: document.getElementById('btn-prefs'),
-  btnOpenFolder: document.getElementById('btn-open-folder'),
-  btnSponsor: document.getElementById('btn-sponsor'),
-  welcomeFile: document.getElementById('welcome-file'),
-  welcomeFolder: document.getElementById('welcome-folder'),
-};
+/**
+ * Every element below is declared in index.html, so a missing one is a build
+ * mistake rather than a runtime condition to handle. Failing loudly at startup
+ * with the offending id beats 50 null checks that can never fire — and beats a
+ * silent `undefined` that surfaces later as an unrelated symptom.
+ */
+function must<T extends Element = HTMLElement>(selector: string): T {
+  const found = document.querySelector<T>(selector);
+  if (!found) throw new Error(`index.html is missing ${selector}`);
+  return found;
+}
 
-/** @type {{prefs: any, folder: string|null, configPath: string, isMac: boolean}} */
-const state = {
-  prefs: null,
-  folder: null,
-  configPath: '',
-  isMac: api.platform === 'darwin',
+const el = {
+  app: must('#app'),
+  topbar: must('#topbar'),
+  crumbs: must('#crumbs'),
+  progress: must('#progress i'),
+  sidebar: must('#sidebar'),
+  sidebarTabs: must('.sidebar-tabs'),
+  sidebarTitle: must('#sidebar-title'),
+  sidebarGrip: must('#sidebar-grip'),
+  tree: must('#tree'),
+  main: must('#main'),
+  tabstrip: must('#tabstrip'),
+  scroller: must('#scroller'),
+  doc: must('#doc'),
+  welcome: must('#welcome'),
+  outlineList: must('#outline-list'),
+  btnSidebar: must<HTMLButtonElement>('#btn-sidebar'),
+  btnFullWidth: must<HTMLButtonElement>('#btn-full-width'),
+  btnTheme: must<HTMLButtonElement>('#btn-theme'),
+  btnPrefs: must<HTMLButtonElement>('#btn-prefs'),
+  btnOpenFolder: must<HTMLButtonElement>('#btn-open-folder'),
+  btnSponsor: must<HTMLButtonElement>('#btn-sponsor'),
+  welcomeFile: must<HTMLButtonElement>('#welcome-file'),
+  welcomeFolder: must<HTMLButtonElement>('#welcome-folder'),
+};
+interface AppState {
+  prefs: Config | null;
+  folder: string | null;
+  configPath: string;
+  isMac: boolean;
   /** Tabs whose file changed on disk while they were in the background. */
-  stale: new Set(),
+  stale: Set<string>;
   /** Guards against a slow render landing after the reader moved on. */
-  renderToken: 0,
+  renderToken: number;
   /**
    * The scroll offset the in-flight render is restoring to, or null when no
    * render is running. While diagrams are still rendering the document is
@@ -72,9 +85,28 @@ const state = {
    * reload that fired in that window must use this target, not the DOM value,
    * or repeated saves would walk the reader up the page.
    */
+  scrollTarget: number | null;
+  openSheet: { close(): void } | null;
+}
+
+const state: AppState = {
+  prefs: null,
+  folder: null,
+  configPath: '',
+  isMac: api.platform === 'darwin',
+  stale: new Set(),
+  renderToken: 0,
   scrollTarget: null,
   openSheet: null,
 };
+/**
+ * Preferences are loaded once during boot, before any handler can run. This
+ * accessor states that invariant instead of every caller re-checking it.
+ */
+function prefs(): Config {
+  if (!state.prefs) throw new Error('preferences were read before boot finished');
+  return state.prefs;
+}
 
 /** The reading position a reload should restore, race-free. */
 function currentScrollTarget() {
@@ -87,19 +119,19 @@ function currentScrollTarget() {
 
 const SEPARATOR = /[/\\]/;
 
-function baseName(filePath) {
+function baseName(filePath: string): string {
   const parts = String(filePath).split(SEPARATOR);
   return parts[parts.length - 1] || filePath;
 }
 
-function dirName(filePath) {
+function dirName(filePath: string): string {
   const normalized = String(filePath).replace(/\\/g, '/');
   const index = normalized.lastIndexOf('/');
   return index <= 0 ? normalized.slice(0, index + 1) || '/' : normalized.slice(0, index);
 }
 
 /** Resolve a relative reference against a directory, collapsing . and .. */
-function resolveRelative(baseDir, reference) {
+function resolveRelative(baseDir: string, reference: string): string {
   const base = String(baseDir).replace(/\\/g, '/').replace(/\/$/, '');
   const ref = String(reference).replace(/\\/g, '/');
   if (/^[a-zA-Z]:\//.test(ref) || ref.startsWith('/')) return ref;
@@ -114,14 +146,14 @@ function resolveRelative(baseDir, reference) {
 }
 
 /** Absolute filesystem path → file:// URL Chromium will load. */
-function toFileUrl(absolutePath) {
+function toFileUrl(absolutePath: string): string {
   let normalized = String(absolutePath).replace(/\\/g, '/');
   if (!normalized.startsWith('/')) normalized = `/${normalized}`;
   // encodeURI leaves ':' and '/' intact; '#' and '?' would otherwise truncate.
   return encodeURI(`file://${normalized}`).replace(/#/g, '%23').replace(/\?/g, '%3F');
 }
 
-function isExternalHref(href) {
+function isExternalHref(href: string): boolean {
   return /^(https?|mailto|tel|ftp|ftps):/i.test(href);
 }
 
@@ -157,19 +189,19 @@ function applyTheme({ rerenderDiagrams = true } = {}) {
 
 function applyReadingPrefs() {
   const root = document.documentElement;
-  root.style.setProperty('--reading-width', `${state.prefs.readingWidth}px`);
-  root.style.setProperty('--font-size', `${state.prefs.fontSize}px`);
-  root.style.setProperty('--sidebar-width', `${state.prefs.sidebarWidth}px`);
-  el.app.dataset.wrapCode = String(Boolean(state.prefs.wrapCode));
-  el.app.dataset.fullWidth = String(Boolean(state.prefs.fullWidth));
-  el.app.dataset.sidebar = state.prefs.sidebarVisible ? 'visible' : 'hidden';
-  el.btnSidebar.setAttribute('aria-pressed', String(Boolean(state.prefs.sidebarVisible)));
-  el.btnFullWidth.setAttribute('aria-pressed', String(Boolean(state.prefs.fullWidth)));
+  root.style.setProperty('--reading-width', `${prefs().readingWidth}px`);
+  root.style.setProperty('--font-size', `${prefs().fontSize}px`);
+  root.style.setProperty('--sidebar-width', `${prefs().sidebarWidth}px`);
+  el.app.dataset.wrapCode = String(Boolean(prefs().wrapCode));
+  el.app.dataset.fullWidth = String(Boolean(prefs().fullWidth));
+  el.app.dataset.sidebar = prefs().sidebarVisible ? 'visible' : 'hidden';
+  el.btnSidebar.setAttribute('aria-pressed', String(Boolean(prefs().sidebarVisible)));
+  el.btnFullWidth.setAttribute('aria-pressed', String(Boolean(prefs().fullWidth)));
 
-  const pane = state.prefs.sidebarPane === 'outline' ? 'outline' : 'files';
+  const pane = prefs().sidebarPane === 'outline' ? 'outline' : 'files';
   el.sidebar.dataset.pane = pane;
   for (const tab of el.sidebarTabs.querySelectorAll('.sidebar-tab')) {
-    tab.setAttribute('aria-selected', String(tab.dataset.pane === pane));
+    tab.setAttribute('aria-selected', String((tab as HTMLElement).dataset.pane === pane));
   }
   outline.setVisible(pane === 'outline');
 
@@ -178,15 +210,15 @@ function applyReadingPrefs() {
 }
 
 /** Show a sidebar view, revealing the sidebar if it was collapsed. */
-function showSidebarPane(pane) {
-  const patch = { sidebarPane: pane };
-  if (!state.prefs.sidebarVisible) patch.sidebarVisible = true;
+function showSidebarPane(pane: SidebarPane): void {
+  const patch: ConfigPatch = { sidebarPane: pane };
+  if (!prefs().sidebarVisible) patch.sidebarVisible = true;
   updatePrefs(patch);
 }
 
 /** Merge a preference patch, apply it live, and persist it. */
-async function updatePrefs(patch) {
-  state.prefs = { ...state.prefs, ...patch };
+async function updatePrefs(patch: ConfigPatch): Promise<Config> {
+  state.prefs = { ...prefs(), ...patch };
   applyReadingPrefs();
   const saved = await api.setConfig(patch);
   state.prefs = { ...state.prefs, ...saved };
@@ -218,13 +250,17 @@ const outline = new Outline(el.outlineList, el.scroller, {
 
 const find = new Find(el.main, el.doc, el.scroller);
 
-/**
- * Load a file into a tab and render it.
- *
- * @param {string} filePath
- * @param {{activate?: boolean, hash?: string, scrollTop?: number, silent?: boolean}} options
- */
-async function openPath(filePath, options = {}) {
+interface OpenPathOptions {
+  activate?: boolean;
+  /** A #heading to scroll to once the document is rendered. */
+  hash?: string;
+  scrollTop?: number | null;
+  /** Suppress the error toast, for speculative opens like session restore. */
+  silent?: boolean;
+}
+
+/** Load a file into a tab and render it. */
+async function openPath(filePath: string, options: OpenPathOptions = {}): Promise<boolean> {
   const { activate = true, hash = '', scrollTop = null, silent = false } = options;
 
   let doc;
@@ -247,7 +283,7 @@ async function openPath(filePath, options = {}) {
     }
     tabs.setActive(doc.path);
     await renderDocument(doc, {
-      scrollTop: scrollTop ?? (existing ? tabs.get(doc.path).scrollTop : 0),
+      scrollTop: scrollTop ?? (existing ? (tabs.get(doc.path)?.scrollTop ?? 0) : 0),
       hash,
     });
   }
@@ -257,7 +293,7 @@ async function openPath(filePath, options = {}) {
 }
 
 /** Render a loaded document into the reading pane. */
-async function renderDocument(doc, { scrollTop = 0, hash = '', preserveDiagramZoom = false } = {}) {
+async function renderDocument(doc: MarkdownDocument, { scrollTop = 0, hash = '', preserveDiagramZoom = false } = {}) {
   const token = (state.renderToken += 1);
   state.scrollTarget = hash ? null : scrollTop;
   const zoomMemory = preserveDiagramZoom ? captureMermaidZoom(el.doc) : null;
@@ -299,7 +335,7 @@ async function renderDocument(doc, { scrollTop = 0, hash = '', preserveDiagramZo
   find.refresh();
 }
 
-function renderFailure(doc, err) {
+function renderFailure(doc: { path: string }, err: unknown): void {
   el.doc.replaceChildren();
   const box = document.createElement('div');
   box.className = 'doc-error';
@@ -316,15 +352,19 @@ function renderFailure(doc, err) {
   el.welcome.hidden = true;
 }
 
-function cleanMessage(err) {
-  return String(err?.message || err || 'Unknown error').replace(/^Error invoking remote method '[^']+':\s*/, '');
+function cleanMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : err;
+  return String(raw || 'Unknown error').replace(
+    /^Error invoking remote method '[^']+':\s*/,
+    ''
+  );
 }
 
 /**
  * Point relative images at real files and tag links by destination so the
  * click handler knows what to do without re-parsing hrefs.
  */
-function resolveAssets(root, docPath) {
+function resolveAssets(root: HTMLElement, docPath: string): void {
   const dir = dirName(docPath);
 
   for (const img of root.querySelectorAll('img')) {
@@ -342,7 +382,7 @@ function resolveAssets(root, docPath) {
     }
   }
 
-  for (const link of root.querySelectorAll('a[href]')) {
+  for (const link of root.querySelectorAll<HTMLAnchorElement>('a[href]')) {
     const href = link.getAttribute('href') || '';
     if (href.startsWith('#')) {
       link.dataset.link = 'anchor';
@@ -356,7 +396,7 @@ function resolveAssets(root, docPath) {
   }
 }
 
-function decodeURIComponentSafe(value) {
+function decodeURIComponentSafe(value: string): string {
   try {
     return decodeURIComponent(value);
   } catch {
@@ -364,13 +404,13 @@ function decodeURIComponentSafe(value) {
   }
 }
 
-function updateCrumbs(docPath) {
+function updateCrumbs(docPath: string): void {
   el.crumbs.replaceChildren();
   const name = baseName(docPath);
 
   // Inside a workspace, show the path relative to its root. Outside one, show
   // only the containing folder — a full absolute path would swamp the bar.
-  let prefix;
+  let prefix: string;
   if (state.folder && docPath.startsWith(state.folder)) {
     const relative = dirName(docPath.slice(state.folder.length).replace(/^[/\\]/, ''));
     prefix =
@@ -396,7 +436,7 @@ function updateCrumbs(docPath) {
   el.crumbs.title = docPath;
 }
 
-function jumpToAnchor(idOrHash, { instant = false } = {}) {
+function jumpToAnchor(idOrHash: string, { instant = false }: { instant?: boolean } = {}): void {
   const id = decodeURIComponentSafe(String(idOrHash).replace(/^#/, ''));
   if (!id) return;
   const target =
@@ -425,15 +465,15 @@ function jumpToAnchor(idOrHash, { instant = false } = {}) {
   outline.highlight(target.id);
 }
 
-function cssEscape(value) {
-  return window.CSS?.escape ? CSS.escape(value) : value.replace(/["\\]/g, '\\$&');
+function cssEscape(value: string): string {
+  return CSS.escape(value);
 }
 
 /* ------------------------------------------------------------------ *
  * Tabs & workspace
  * ------------------------------------------------------------------ */
 
-async function activateTab(path) {
+async function activateTab(path: string): Promise<void> {
   if (path === tabs.activePath) return;
   if (tabs.activePath) tabs.saveScroll(tabs.activePath, el.scroller.scrollTop);
 
@@ -454,7 +494,7 @@ async function activateTab(path) {
   syncWorkspace();
 }
 
-function closeTab(path) {
+function closeTab(path: string): void {
   const next = tabs.remove(path);
   state.stale.delete(path);
   if (next) {
@@ -494,12 +534,18 @@ function syncWorkspace() {
  *        chose "Open Folder" wants — but not on session restore, where it would
  *        override a sidebar the reader deliberately collapsed before quitting.
  */
-async function openFolder(folderPath, { restoreFiles = null, revealSidebar = true } = {}) {
+async function openFolder(
+  folderPath: string,
+  {
+    restoreFiles = null,
+    revealSidebar = true,
+  }: { restoreFiles?: string[] | null; revealSidebar?: boolean } = {}
+): Promise<void> {
   try {
     const data = await api.readTree(folderPath);
     state.folder = data.root;
     tree.setData(data);
-    if (revealSidebar && !state.prefs.sidebarVisible) await updatePrefs({ sidebarVisible: true });
+    if (revealSidebar && !prefs().sidebarVisible) await updatePrefs({ sidebarVisible: true });
   } catch (err) {
     toast(`Could not open folder: ${cleanMessage(err)}`, { error: true });
     return;
@@ -536,7 +582,7 @@ async function refreshTree() {
  * ------------------------------------------------------------------ */
 
 el.doc.addEventListener('click', async (event) => {
-  const copyButton = event.target.closest('[data-copy]');
+  const copyButton = (event.target as Element | null)?.closest<HTMLElement>('[data-copy]');
   if (copyButton) {
     event.preventDefault();
     const code = copyButton.closest('.code-block')?.querySelector('code');
@@ -556,7 +602,7 @@ el.doc.addEventListener('click', async (event) => {
     return;
   }
 
-  const link = event.target.closest('a[href]');
+  const link = (event.target as Element | null)?.closest<HTMLAnchorElement>('a[href]');
   if (!link) return;
   event.preventDefault();
   const href = link.getAttribute('href') || '';
@@ -597,7 +643,7 @@ el.doc.addEventListener('click', async (event) => {
   await openPath(resolved, { activate: true, hash: fragment });
 });
 
-function splitHash(href) {
+function splitHash(href: string): [string, string] {
   const index = href.indexOf('#');
   if (index === -1) return [href, ''];
   return [href.slice(0, index), href.slice(index + 1)];
@@ -634,7 +680,7 @@ api.onFileRemoved((removedPath) => {
   }
 });
 
-let treeRefreshTimer = null;
+let treeRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 api.onTreeChanged(() => {
   if (treeRefreshTimer) clearTimeout(treeRefreshTimer);
   treeRefreshTimer = setTimeout(refreshTree, 250);
@@ -693,11 +739,11 @@ const commands = {
     const previous = tabs.neighbour(-1);
     if (previous) activateTab(previous);
   },
-  'sidebar:toggle': () => updatePrefs({ sidebarVisible: !state.prefs.sidebarVisible }),
+  'sidebar:toggle': () => updatePrefs({ sidebarVisible: !prefs().sidebarVisible }),
   'sidebar:files': () => showSidebarPane('files'),
   'sidebar:outline': () => showSidebarPane('outline'),
   'sidebar:switch': () =>
-    showSidebarPane(state.prefs.sidebarPane === 'outline' ? 'files' : 'outline'),
+    showSidebarPane(prefs().sidebarPane === 'outline' ? 'files' : 'outline'),
   'theme:cycle': () => toggleTheme(),
   // Handed to the OS browser rather than fetched: the app itself still makes no
   // network requests, so the offline guarantee is untouched.
@@ -705,15 +751,15 @@ const commands = {
     const opened = await api.openExternal(SPONSOR_URL);
     if (!opened) toast('Could not open your browser', { error: true });
   },
-  'font:bigger': () => updatePrefs({ fontSize: clampPref(state.prefs.fontSize + 1, 13, 24) }),
-  'font:smaller': () => updatePrefs({ fontSize: clampPref(state.prefs.fontSize - 1, 13, 24) }),
+  'font:bigger': () => updatePrefs({ fontSize: clampPref(prefs().fontSize + 1, 13, 24) }),
+  'font:smaller': () => updatePrefs({ fontSize: clampPref(prefs().fontSize - 1, 13, 24) }),
   'font:reset': () => updatePrefs({ fontSize: 17 }),
-  'width:full': () => updatePrefs({ fullWidth: !state.prefs.fullWidth }),
+  'width:full': () => updatePrefs({ fullWidth: !prefs().fullWidth }),
   // Nudging the measure implies you want a measure, so it leaves full width.
   'width:wider': () =>
-    updatePrefs({ fullWidth: false, readingWidth: clampPref(state.prefs.readingWidth + 40, 560, 1100) }),
+    updatePrefs({ fullWidth: false, readingWidth: clampPref(prefs().readingWidth + 40, 560, 1100) }),
   'width:narrower': () =>
-    updatePrefs({ fullWidth: false, readingWidth: clampPref(state.prefs.readingWidth - 40, 560, 1100) }),
+    updatePrefs({ fullWidth: false, readingWidth: clampPref(prefs().readingWidth - 40, 560, 1100) }),
   'doc:top': () => el.scroller.scrollTo({ top: 0, behavior: 'smooth' }),
   'doc:bottom': () => el.scroller.scrollTo({ top: el.scroller.scrollHeight, behavior: 'smooth' }),
   'find:open': () => find.open(),
@@ -724,12 +770,15 @@ const commands = {
   'help:shortcuts': () => toggleSheet(() => openShortcuts({ isMac: state.isMac, onClose: clearSheet })),
 };
 
-function clampPref(value, min, max) {
+function clampPref(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function run(command) {
-  commands[command]?.();
+type CommandName = keyof typeof commands;
+
+function run(command: string): void {
+  // Menu commands arrive as plain strings from the main process.
+  commands[command as CommandName]?.();
 }
 
 api.onMenuCommand(({ command }) => run(command));
@@ -740,7 +789,7 @@ function clearSheet() {
   state.openSheet = null;
 }
 
-function toggleSheet(factory) {
+function toggleSheet(factory: () => { close(): void }): void {
   if (state.openSheet) {
     state.openSheet.close();
     return;
@@ -751,7 +800,7 @@ function toggleSheet(factory) {
 function togglePreferences() {
   toggleSheet(() =>
     openPreferences({
-      prefs: state.prefs,
+      prefs: prefs(),
       configPath: state.configPath,
       onChange: (patch) => updatePrefs(patch),
       onClose: clearSheet,
@@ -783,9 +832,10 @@ el.btnSidebar.addEventListener('click', () => run('sidebar:toggle'));
 el.btnFullWidth.addEventListener('click', () => run('width:full'));
 el.btnTheme.addEventListener('click', () => run('theme:cycle'));
 
-el.sidebarTabs.addEventListener('click', (event) => {
-  const pane = event.target.closest('.sidebar-tab')?.dataset.pane;
-  if (pane) showSidebarPane(pane);
+el.sidebarTabs.addEventListener('click', (event: MouseEvent) => {
+  const pane = (event.target as Element | null)?.closest<HTMLElement>('.sidebar-tab')?.dataset
+    .pane;
+  if (pane === 'files' || pane === 'outline') showSidebarPane(pane);
 });
 el.btnPrefs.addEventListener('click', () => run('prefs:toggle'));
 el.btnOpenFolder.addEventListener('click', () => run('folder:open'));
@@ -802,7 +852,7 @@ el.sidebarGrip.addEventListener('pointerdown', (event) => {
   const startX = event.clientX;
   const startWidth = el.sidebar.getBoundingClientRect().width;
 
-  const onMove = (moveEvent) => {
+  const onMove = (moveEvent: PointerEvent) => {
     const width = clampPref(startWidth + (moveEvent.clientX - startX), 180, 480);
     document.documentElement.style.setProperty('--sidebar-width', `${Math.round(width)}px`);
   };
@@ -826,7 +876,7 @@ function updateProgress() {
   el.progress.style.width = `${Math.min(100, Math.max(0, ratio * 100))}%`;
 }
 
-let scrollSaveTimer = null;
+let scrollSaveTimer: ReturnType<typeof setTimeout> | null = null;
 el.scroller.addEventListener(
   'scroll',
   () => {
@@ -839,7 +889,7 @@ el.scroller.addEventListener(
   { passive: true }
 );
 
-let resizeTimer = null;
+let resizeTimer: ReturnType<typeof setTimeout> | null = null;
 window.addEventListener('resize', () => {
   if (resizeTimer) clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
@@ -896,7 +946,7 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
-function isTypingTarget(target) {
+function isTypingTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && /^(input|textarea|select)$/i.test(target.tagName);
 }
 
@@ -907,8 +957,9 @@ function isTypingTarget(target) {
 async function boot() {
   document.body.dataset.platform = api.platform;
 
-  state.prefs = await api.getConfig();
-  state.configPath = state.prefs.configPath || '';
+  const loaded = await api.getConfig();
+  state.prefs = loaded;
+  state.configPath = loaded.configPath;
   applyReadingPrefs();
   applyTheme({ rerenderDiagrams: false });
 

@@ -1,3 +1,5 @@
+import type { Config, ConfigPatch, ThemePreference } from '../types/bridge.js';
+
 /**
  * Transient sheets: preferences, quick open, and the shortcut reference.
  * Each returns a controller with open/close/toggle so main.js can treat them
@@ -7,10 +9,25 @@
 const overlayRoot = () => document.getElementById('overlay-root');
 
 /** Shared plumbing: scrim, outside-click, Escape, focus restore. */
-function mountSheet(sheet, { onClose, scrim = true, initialFocus = null }) {
+export interface SheetController {
+  readonly isOpen: boolean;
+  close(): void;
+}
+
+interface MountOptions {
+  onClose: () => void;
+  scrim?: boolean;
+  initialFocus?: HTMLElement | null;
+}
+
+function mountSheet(
+  sheet: HTMLElement,
+  { onClose, scrim = true, initialFocus = null }: MountOptions
+): SheetController {
   const host = overlayRoot();
+  if (!host) throw new Error('overlay root is missing from index.html');
   const previousFocus = document.activeElement;
-  const nodes = [];
+  const nodes: Element[] = [];
 
   if (scrim) {
     const backdrop = document.createElement('div');
@@ -22,7 +39,7 @@ function mountSheet(sheet, { onClose, scrim = true, initialFocus = null }) {
   host.append(sheet);
   nodes.push(sheet);
 
-  function onKeyDown(event) {
+  function onKeyDown(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
@@ -62,7 +79,19 @@ function mountSheet(sheet, { onClose, scrim = true, initialFocus = null }) {
  * @param {(patch: object) => void} options.onChange applied live, then persisted
  * @param {string} options.configPath shown at the bottom so the file is findable
  */
-export function openPreferences({ prefs, onChange, configPath, onClose }) {
+export interface PreferencesOptions {
+  prefs: Config;
+  onChange(patch: ConfigPatch): void;
+  configPath: string;
+  onClose: () => void;
+}
+
+export function openPreferences({
+  prefs,
+  onChange,
+  configPath,
+  onClose,
+}: PreferencesOptions): SheetController {
   const sheet = document.createElement('div');
   sheet.className = 'sheet prefs';
   sheet.setAttribute('role', 'dialog');
@@ -79,7 +108,12 @@ export function openPreferences({ prefs, onChange, configPath, onClose }) {
   const themeField = field('Theme');
   const seg = document.createElement('div');
   seg.className = 'seg';
-  for (const [value, label] of [['system', 'System'], ['light', 'Light'], ['dark', 'Dark']]) {
+  const themeOptions: Array<[ThemePreference, string]> = [
+    ['system', 'System'],
+    ['light', 'Light'],
+    ['dark', 'Dark'],
+  ];
+  for (const [value, label] of themeOptions) {
     const button = document.createElement('button');
     button.type = 'button';
     button.textContent = label;
@@ -103,8 +137,8 @@ export function openPreferences({ prefs, onChange, configPath, onClose }) {
     value: prefs.readingWidth,
     format: (v) => `${v}px`,
     // Dragging the measure means you want a measure, so it leaves full width.
-    onInput: (v) => {
-      if (fullWidthInput.checked) {
+    onInput: (v: number) => {
+      if (fullWidthInput?.checked) {
         fullWidthInput.checked = false;
         widthField.input.disabled = false;
       }
@@ -151,10 +185,10 @@ export function openPreferences({ prefs, onChange, configPath, onClose }) {
   foot.append(code);
 
   sheet.append(title, body, foot);
-  return mountSheet(sheet, { onClose, scrim: true, initialFocus: seg.firstElementChild });
+  return mountSheet(sheet, { onClose, scrim: true, initialFocus: seg.firstElementChild as HTMLElement | null });
 }
 
-function field(labelText) {
+function field(labelText: string): HTMLDivElement {
   const wrap = document.createElement('div');
   wrap.className = 'pref';
   const row = document.createElement('div');
@@ -167,13 +201,35 @@ function field(labelText) {
   return wrap;
 }
 
-/** Returns the field wrapper, with `.input` exposed so callers can disable it. */
-function slider({ label, min, max, step, value, format, onInput }) {
+interface SliderOptions {
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  format(value: number): string;
+  onInput(value: number): void;
+}
+
+/** A field wrapper that also exposes its input, so callers can disable it. */
+interface SliderField extends HTMLDivElement {
+  input: HTMLInputElement;
+}
+
+function slider({
+  label,
+  min,
+  max,
+  step,
+  value,
+  format,
+  onInput,
+}: SliderOptions): SliderField {
   const wrap = field(label);
   const readout = document.createElement('span');
   readout.className = 'pref-value';
   readout.textContent = format(value);
-  wrap.querySelector('.pref-row').append(readout);
+  wrap.querySelector('.pref-row')?.append(readout);
 
   const input = document.createElement('input');
   input.type = 'range';
@@ -188,11 +244,18 @@ function slider({ label, min, max, step, value, format, onInput }) {
     onInput(next);
   });
   wrap.append(input);
-  wrap.input = input;
-  return wrap;
+  const sliderField = wrap as SliderField;
+  sliderField.input = input;
+  return sliderField;
 }
 
-function checkbox({ label: labelText, checked, onChange }) {
+interface CheckboxOptions {
+  label: string;
+  checked: boolean;
+  onChange(checked: boolean): void;
+}
+
+function checkbox({ label: labelText, checked, onChange }: CheckboxOptions): HTMLElement {
   const wrap = document.createElement('div');
   wrap.className = 'pref';
   const label = document.createElement('label');
@@ -220,7 +283,24 @@ function checkbox({ label: labelText, checked, onChange }) {
  * @param {string} options.rootPath used to shorten displayed paths
  * @param {(path: string) => void} options.onPick
  */
-export function openQuickOpen({ files, rootPath, onPick, onClose }) {
+export interface QuickOpenFile {
+  path: string;
+  name: string;
+}
+
+export interface QuickOpenOptions {
+  files: QuickOpenFile[];
+  rootPath: string | null;
+  onPick(path: string): void;
+  onClose: () => void;
+}
+
+export function openQuickOpen({
+  files,
+  rootPath,
+  onPick,
+  onClose,
+}: QuickOpenOptions): SheetController {
   const sheet = document.createElement('div');
   sheet.className = 'sheet quickopen';
   sheet.setAttribute('role', 'dialog');
@@ -237,10 +317,10 @@ export function openQuickOpen({ files, rootPath, onPick, onClose }) {
   list.className = 'qo-list';
   sheet.append(input, list);
 
-  let results = [];
+  let results: Array<{ file: QuickOpenFile; score: number }> = [];
   let selected = 0;
 
-  function shortPath(path) {
+  function shortPath(path: string): string {
     if (rootPath && path.startsWith(rootPath)) {
       return path.slice(rootPath.length).replace(/^[/\\]/, '');
     }
@@ -254,7 +334,7 @@ export function openQuickOpen({ files, rootPath, onPick, onClose }) {
     draw(query);
   }
 
-  function draw(query) {
+  function draw(query: string): void {
     if (results.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'qo-empty';
@@ -295,7 +375,7 @@ export function openQuickOpen({ files, rootPath, onPick, onClose }) {
     list.replaceChildren(fragment);
   }
 
-  function move(offset) {
+  function move(offset: number): void {
     if (results.length === 0) return;
     selected = (selected + offset + results.length) % results.length;
     for (const [index, child] of [...list.children].entries()) {
@@ -331,12 +411,12 @@ export function openQuickOpen({ files, rootPath, onPick, onClose }) {
  * Subsequence matcher. Scores contiguous runs, word starts and basename hits
  * above scattered matches, which is what makes typing initials work.
  */
-function rank(files, query) {
+function rank(files: QuickOpenFile[], query: string): Array<{ file: QuickOpenFile; score: number }> {
   if (!query) {
     return files.map((file) => ({ file, score: 0 }));
   }
   const needle = query.toLowerCase();
-  const scored = [];
+  const scored: Array<{ file: QuickOpenFile; score: number }> = [];
 
   for (const file of files) {
     const name = file.name.toLowerCase();
@@ -351,7 +431,7 @@ function rank(files, query) {
   return scored;
 }
 
-function score(haystack, needle) {
+function score(haystack: string, needle: string): number {
   let hay = 0;
   let total = 0;
   let streak = 0;
@@ -377,7 +457,7 @@ function score(haystack, needle) {
 }
 
 /** Bold the matched subsequence characters in a label. */
-function highlightMatches(target, text, query) {
+function highlightMatches(target: HTMLElement, text: string, query: string): void {
   if (!query) {
     target.textContent = text;
     return;
@@ -408,12 +488,12 @@ function highlightMatches(target, text, query) {
  * Shortcuts reference
  * ------------------------------------------------------------------ */
 
-export function openShortcuts({ isMac, onClose }) {
+export function openShortcuts({ isMac, onClose }: { isMac: boolean; onClose: () => void }): SheetController {
   const mod = isMac ? '⌘' : 'Ctrl';
   const alt = isMac ? '⌥' : 'Alt';
   const shift = isMac ? '⇧' : 'Shift';
 
-  const GROUPS = [
+  const GROUPS: Array<[string, Array<[string, string]>]> = [
     ['Files', [
       [`${mod}O`, 'Open file'],
       [`${shift}${mod}O`, 'Open folder'],

@@ -18,7 +18,7 @@ import hljs from 'highlight.js/lib/common';
  * Language labels
  * ------------------------------------------------------------------ */
 
-const LANGUAGE_NAMES = {
+const LANGUAGE_NAMES: Record<string, string> = {
   bash: 'Shell', sh: 'Shell', zsh: 'Shell', shell: 'Shell', console: 'Console',
   js: 'JavaScript', javascript: 'JavaScript', jsx: 'JSX', mjs: 'JavaScript',
   ts: 'TypeScript', typescript: 'TypeScript', tsx: 'TSX',
@@ -35,20 +35,23 @@ const LANGUAGE_NAMES = {
   mermaid: 'Diagram', text: 'Text', txt: 'Text', plaintext: 'Text',
 };
 
-function languageLabel(info) {
+function languageLabel(info: string | undefined): string {
   if (!info) return 'Text';
   const key = info.toLowerCase();
-  return LANGUAGE_NAMES[key] || info.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  return (
+    LANGUAGE_NAMES[key] ||
+    info.replace(/[-_]/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+  );
 }
 
 /* ------------------------------------------------------------------ *
  * Fence info parsing:  ```ts title="server.ts"  →  { lang, title }
  * ------------------------------------------------------------------ */
 
-function parseFenceInfo(raw) {
+function parseFenceInfo(raw: string | undefined): { lang: string; title: string } {
   const info = (raw || '').trim();
   if (!info) return { lang: '', title: '' };
-  const [first, ...rest] = info.split(/\s+/);
+  const [first = '', ...rest] = info.split(/\s+/);
   const tail = rest.join(' ');
   const titled = tail.match(/(?:title|file|filename)\s*=\s*["']?([^"']+)["']?/i);
   return { lang: first.replace(/[{},]/g, ''), title: titled ? titled[1].trim() : '' };
@@ -68,7 +71,7 @@ const md = new MarkdownIt({
   langPrefix: 'language-',
 });
 
-md.use(frontMatterPlugin, (text) => {
+md.use(frontMatterPlugin, (text: string) => {
   capturedFrontMatter = text;
 });
 md.use(footnotePlugin);
@@ -84,7 +87,7 @@ md.use(anchorPlugin, {
 });
 
 /** GitHub-compatible heading slugs, so `#some-heading` links keep working. */
-function slugifyHeading(text) {
+function slugifyHeading(text: string): string {
   const base = String(text)
     .trim()
     .toLowerCase()
@@ -171,12 +174,13 @@ const SAFE_URL = /^(?:https?:|mailto:|tel:|file:|#|\/|\.{1,2}\/|[^:/?#]*(?:[/?#]
  * Markdown file is still untrusted input — and the CSP alone would not stop,
  * say, an `onerror` handler or a `javascript:` href.
  */
-function sanitizeInto(html, target) {
+function sanitizeInto(html: string, target: Element): void {
   const parsed = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
 
   const walker = parsed.createTreeWalker(parsed.body, NodeFilter.SHOW_ELEMENT);
-  const doomed = [];
-  let node = walker.nextNode();
+  const doomed: Array<{ node: Element; unwrap: boolean }> = [];
+  // SHOW_ELEMENT guarantees Elements, but the DOM types still say Node.
+  let node = walker.nextNode() as Element | null;
 
   while (node) {
     const tag = node.tagName.toLowerCase();
@@ -190,8 +194,10 @@ function sanitizeInto(html, target) {
       // Column alignment arrives as an inline style, which is about to be
       // stripped — carry it over to the `align` attribute first.
       if ((tag === 'th' || tag === 'td') && node.hasAttribute('style')) {
-        const aligned = node.getAttribute('style').match(/text-align:\s*(left|center|right)/i);
-        if (aligned) node.setAttribute('align', aligned[1].toLowerCase());
+        const aligned = (node.getAttribute('style') ?? '').match(
+          /text-align:\s*(left|center|right)/i
+        );
+        if (aligned?.[1]) node.setAttribute('align', aligned[1].toLowerCase());
       }
 
       for (const attr of [...node.attributes]) {
@@ -215,7 +221,7 @@ function sanitizeInto(html, target) {
         }
       }
     }
-    node = walker.nextNode();
+    node = walker.nextNode() as Element | null;
   }
 
   for (const { node: victim, unwrap } of doomed) {
@@ -232,8 +238,8 @@ function sanitizeInto(html, target) {
  * ------------------------------------------------------------------ */
 
 /** Minimal top-level YAML scalar/list reader — enough to show a header. */
-function parseFrontMatter(text) {
-  const entries = [];
+function parseFrontMatter(text: string): Array<[string, string]> {
+  const entries: Array<[string, string]> = [];
   if (!text) return entries;
   const lines = text.split(/\r?\n/);
   for (let i = 0; i < lines.length; i += 1) {
@@ -258,7 +264,7 @@ function parseFrontMatter(text) {
   return entries.slice(0, 12);
 }
 
-function frontMatterElement(entries) {
+function frontMatterElement(entries: Array<[string, string]>): HTMLElement | null {
   if (entries.length === 0) return null;
   const wrap = document.createElement('div');
   wrap.className = 'doc-frontmatter';
@@ -278,11 +284,22 @@ function frontMatterElement(entries) {
  * Public API
  * ------------------------------------------------------------------ */
 
+export interface Heading {
+  id: string;
+  level: number;
+  text: string;
+}
+
+export interface RenderResult {
+  headings: Heading[];
+  frontMatter: Array<[string, string]>;
+}
+
 /**
  * Render Markdown into `target`, replacing its contents.
  * @returns {{ headings: Array<{id:string,level:number,text:string}>, frontMatter: Array<[string,string]> }}
  */
-export function renderMarkdown(source, target) {
+export function renderMarkdown(source: string, target: HTMLElement): RenderResult {
   capturedFrontMatter = '';
   const html = md.render(source);
   const frontMatter = parseFrontMatter(capturedFrontMatter);
@@ -302,8 +319,8 @@ export function renderMarkdown(source, target) {
  * Add the language label and copy button to each fenced block. Built here,
  * post-sanitize, so no interactive chrome has to pass through the scrubber.
  */
-function addCodeHeaders(root) {
-  for (const block of root.querySelectorAll('.code-block')) {
+function addCodeHeaders(root: Element): void {
+  for (const block of root.querySelectorAll<HTMLElement>('.code-block')) {
     if (block.querySelector(':scope > .code-head')) continue;
 
     const head = document.createElement('div');
@@ -325,7 +342,7 @@ function addCodeHeaders(root) {
 }
 
 /** Turn `> [!NOTE]` blockquotes into callouts. */
-function transformCallouts(root) {
+function transformCallouts(root: Element): void {
   const KINDS = new Set(['note', 'tip', 'important', 'warning', 'caution']);
   for (const quote of root.querySelectorAll('blockquote')) {
     const first = quote.firstElementChild;
@@ -356,8 +373,8 @@ function transformCallouts(root) {
   }
 }
 
-function collectHeadings(root) {
-  const headings = [];
+function collectHeadings(root: Element): Heading[] {
+  const headings: Heading[] = [];
   for (const el of root.querySelectorAll('h1, h2, h3, h4, h5, h6')) {
     const anchor = el.querySelector('.heading-anchor');
     const text = [...el.childNodes]

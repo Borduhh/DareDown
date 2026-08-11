@@ -32,10 +32,10 @@ const RENDERER_HTML = path.join(__dirname, '..', '..', 'dist', 'renderer', 'inde
 
 /** @type {BrowserWindow | null} */
 let win = null;
-/** @type {Watcher | null} */
+/** @type {InstanceType<typeof Watcher> | null} */
 let watcher = null;
 let rendererReady = false;
-/** Paths requested before the renderer finished booting. */
+/** Paths requested before the renderer finished booting. @type {string[]} */
 const pendingPaths = [];
 
 app.setName('DareDown');
@@ -60,7 +60,11 @@ if (!app.requestSingleInstanceLock()) {
  * Window
  * ------------------------------------------------------------------ */
 
-/** Keep a restored window on a display that actually exists. */
+/**
+ * Keep a restored window on a display that actually exists.
+ *
+ * @param {import('../types/bridge.js').WindowState} saved
+ */
 function visibleBounds(saved) {
   const { width, height, x, y } = saved;
   if (x === null || y === null) return { width, height };
@@ -76,7 +80,10 @@ function createWindow() {
   const bounds = visibleBounds(prefs.window);
   const isDark = resolveDark(prefs.theme);
 
-  win = new BrowserWindow({
+  // Held locally as well as on the module: `win` is nullable and can be cleared
+  // by 'closed' before a queued handler runs, but inside this function the
+  // window definitely exists.
+  const created = new BrowserWindow({
     ...bounds,
     minWidth: 520,
     minHeight: 400,
@@ -101,40 +108,49 @@ function createWindow() {
     },
   });
 
-  if (prefs.window.maximized) win.maximize();
+  win = created;
+  if (prefs.window.maximized) created.maximize();
 
-  win.once('ready-to-show', () => {
-    win.show();
+  created.once('ready-to-show', () => {
+    created.show();
   });
 
-  win.on('close', () => {
+  created.on('close', () => {
     persistWindowState();
     config.flush();
   });
 
-  win.on('closed', () => {
+  created.on('closed', () => {
     win = null;
     rendererReady = false;
   });
 
-  for (const event of ['resize', 'move', 'maximize', 'unmaximize']) {
-    win.on(event, debounce(persistWindowState, 350));
-  }
+  const persist = debounce(persistWindowState, 350);
+  created.on('resize', persist);
+  created.on('move', persist);
+  created.on('maximize', persist);
+  created.on('unmaximize', persist);
 
   // Never navigate away from the local document, and route any target=_blank
   // through the OS browser after an explicit protocol check.
-  win.webContents.setWindowOpenHandler(({ url }) => {
+  created.webContents.setWindowOpenHandler(({ url }) => {
     openExternal(url);
     return { action: 'deny' };
   });
-  win.webContents.on('will-navigate', (event, url) => {
-    if (url !== win.webContents.getURL()) {
+  created.webContents.on('will-navigate', (event, url) => {
+    if (url !== created.webContents.getURL()) {
       event.preventDefault();
       openExternal(url);
     }
   });
 
-  win.loadFile(RENDERER_HTML);
+  created.loadFile(RENDERER_HTML);
+  return created;
+}
+
+/** The dialogs are only reachable from a menu, which requires a window. */
+function requireWindow() {
+  if (!win) throw new Error('no window is open');
   return win;
 }
 
@@ -165,8 +181,9 @@ const ALLOWED_SCHEMES = new Set(['file:', 'data:', 'blob:', 'devtools:', 'chrome
  * all of its assets, so a blocked request means a bug or an untrusted document
  * trying to phone home — either way it should not be silently allowed.
  */
+/** @param {Electron.Session} targetSession */
 function installNetworkBlock(targetSession) {
-  targetSession.webRequest.onBeforeRequest((details, callback) => {
+  targetSession.webRequest.onBeforeRequest((/** @type {any} */ details, /** @type {any} */ callback) => {
     let scheme;
     try {
       scheme = new URL(details.url).protocol;
@@ -179,33 +196,44 @@ function installNetworkBlock(targetSession) {
   });
 
   // Nothing in the app needs these, and denying keeps documents inert.
-  targetSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+  targetSession.setPermissionRequestHandler((_wc, _permission, /** @type {(granted: boolean) => void} */ callback) =>
+    callback(false)
+  );
   targetSession.setPermissionCheckHandler(() => false);
 }
 
+/** @param {string} themePref */
 function resolveDark(themePref) {
   if (themePref === 'dark') return true;
   if (themePref === 'light') return false;
   return nativeTheme.shouldUseDarkColors;
 }
 
+/** @param {string} themePref */
 function applyThemeSource(themePref) {
-  nativeTheme.themeSource = themePref === 'system' ? 'system' : themePref;
+  nativeTheme.themeSource = /** @type {'system' | 'light' | 'dark'} */ (
+    themePref === 'system' ? 'system' : themePref
+  );
 }
 
 /* ------------------------------------------------------------------ *
  * Opening documents
  * ------------------------------------------------------------------ */
 
-/** Pull Markdown paths out of a process argv vector. */
+/**
+ * Pull Markdown paths out of a process argv vector.
+ *
+ * @param {string[]} argv
+ */
 function collectPathArgs(argv) {
   return argv
     .slice(app.isPackaged ? 1 : 2)
-    .filter((arg) => !arg.startsWith('-'))
-    .map((arg) => path.resolve(arg))
-    .filter((arg) => files.isMarkdown(arg) || !path.extname(arg));
+    .filter((/** @type {string} */ arg) => !arg.startsWith('-'))
+    .map((/** @type {string} */ arg) => path.resolve(arg))
+    .filter((/** @type {string} */ arg) => files.isMarkdown(arg) || !path.extname(arg));
 }
 
+/** @param {string[] | null | undefined} paths */
 function queuePaths(paths) {
   if (!paths || paths.length === 0) return;
   if (rendererReady && win && !win.isDestroyed()) {
@@ -221,6 +249,7 @@ function flushPendingPaths() {
   win.webContents.send('app:open-paths', paths);
 }
 
+/** @param {string} url */
 function openExternal(url) {
   // Only ever hand http(s) and mailto to the OS; never file:// or custom schemes.
   try {
@@ -270,7 +299,7 @@ function registerIpc() {
   });
 
   ipcMain.handle('dialog:open-file', async () => {
-    const result = await dialog.showOpenDialog(win, {
+    const result = await dialog.showOpenDialog(requireWindow(), {
       title: 'Open Markdown File',
       buttonLabel: 'Open',
       properties: ['openFile', 'multiSelections'],
@@ -283,7 +312,7 @@ function registerIpc() {
   });
 
   ipcMain.handle('dialog:open-folder', async () => {
-    const result = await dialog.showOpenDialog(win, {
+    const result = await dialog.showOpenDialog(requireWindow(), {
       title: 'Open Folder',
       buttonLabel: 'Open',
       properties: ['openDirectory'],
@@ -313,7 +342,9 @@ function registerIpc() {
 
   ipcMain.handle('watch:set', async (_event, payload) => {
     if (!watcher) return false;
-    const openFiles = Array.isArray(payload?.files) ? payload.files.filter((f) => typeof f === 'string') : [];
+    const openFiles = Array.isArray(payload?.files)
+      ? payload.files.filter((/** @type {unknown} */ f) => typeof f === 'string')
+      : [];
     const folder = typeof payload?.folder === 'string' ? payload.folder : null;
     await Promise.all([watcher.setFiles(openFiles), watcher.setFolder(folder)]);
     return true;
@@ -383,9 +414,16 @@ app.on('before-quit', async () => {
  * Utilities
  * ------------------------------------------------------------------ */
 
+/**
+ * @template {(...args: any[]) => void} F
+ * @param {F} fn
+ * @param {number} ms
+ * @returns {(...args: Parameters<F>) => void}
+ */
 function debounce(fn, ms) {
+  /** @type {ReturnType<typeof setTimeout> | null} */
   let timer = null;
-  return (...args) => {
+  return (/** @type {Parameters<F>} */ ...args) => {
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {
       timer = null;

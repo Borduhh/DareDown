@@ -91,7 +91,7 @@ async function verifyNoDynamicImports() {
 }
 
 const options = {
-  entryPoints: [path.join(root, 'src', 'renderer', 'main.js')],
+  entryPoints: [path.join(root, 'src', 'renderer', 'main.ts')],
   outfile: path.join(outdir, 'app.js'),
   bundle: true,
   format: 'iife',

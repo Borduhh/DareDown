@@ -12,32 +12,52 @@
 /** How far below the top of the viewport the "you are here" line sits. */
 const CURRENT_LINE_OFFSET = 24;
 
+export interface OutlineHandlers {
+  onJump(id: string): void;
+}
+
+interface HeadingTarget {
+  id: string;
+  el: HTMLElement;
+}
+
+interface HeadingOffset {
+  id: string;
+  top: number;
+}
+
 export class Outline {
+  private readonly list: HTMLElement;
+  private readonly scroller: HTMLElement;
+  private readonly handlers: OutlineHandlers;
+  private readonly buttons = new Map<string, HTMLButtonElement>();
+  private targets: HeadingTarget[] = [];
+  private offsets: HeadingOffset[] = [];
+  private dirty = true;
+  private currentId: string | null = null;
+  private visible = false;
+  private readonly resizeObserver: ResizeObserver;
+
   /**
    * @param {HTMLElement} listElement
    * @param {HTMLElement} scroller
    * @param {{ onJump: (id: string) => void }} handlers
    */
-  constructor(listElement, scroller, handlers) {
+  constructor(listElement: HTMLElement, scroller: HTMLElement, handlers: OutlineHandlers) {
     this.list = listElement;
     this.scroller = scroller;
     this.handlers = handlers;
 
-    /** @type {Map<string, HTMLElement>} */
-    this.buttons = new Map();
-    /** @type {Array<{id: string, el: HTMLElement}>} */
-    this.targets = [];
-    /** @type {Array<{id: string, top: number}>} */
-    this.offsets = [];
     /** Offsets need re-measuring (content grew, window resized, prefs changed). */
     this.dirty = true;
     this.currentId = null;
     /** Whether this view is the one on screen. */
     this.visible = false;
 
-    this.list.addEventListener('click', (event) => {
-      const item = event.target.closest('[data-id]');
-      if (item) this.handlers.onJump(item.dataset.id);
+    this.list.addEventListener('click', (event: MouseEvent) => {
+      const item = (event.target as Element | null)?.closest<HTMLElement>('[data-id]');
+      const id = item?.dataset.id;
+      if (id) this.handlers.onJump(id);
     });
 
     this.scroller.addEventListener('scroll', () => this.update(), { passive: true });
@@ -54,7 +74,7 @@ export class Outline {
    * @param {Array<{id: string, level: number, text: string}>} headings
    * @param {HTMLElement} docRoot
    */
-  setHeadings(headings, docRoot) {
+  setHeadings(headings: Array<{ id: string; level: number; text: string }>, docRoot: HTMLElement): void {
     this.resizeObserver.disconnect();
     this.buttons.clear();
     this.targets = [];
@@ -75,7 +95,7 @@ export class Outline {
     const fragment = document.createDocumentFragment();
 
     for (const heading of headings) {
-      const target = docRoot.querySelector(`#${cssEscape(heading.id)}`);
+      const target = docRoot.querySelector<HTMLElement>(`#${cssEscape(heading.id)}`);
       if (!target) continue;
 
       const button = document.createElement('button');
@@ -97,7 +117,7 @@ export class Outline {
   }
 
   /** Cache each heading's offset within the scroller's content. */
-  measure() {
+  measure(): void {
     const base = this.scroller.getBoundingClientRect().top;
     const scrollTop = this.scroller.scrollTop;
     this.offsets = this.targets.map(({ id, el }) => ({
@@ -108,7 +128,7 @@ export class Outline {
   }
 
   /** Highlight the last heading at or above the current-position line. */
-  update() {
+  update(): void {
     if (this.targets.length === 0) return;
     if (this.dirty) this.measure();
 
@@ -138,7 +158,7 @@ export class Outline {
   }
 
   /** Called when the sidebar switches views. */
-  setVisible(visible) {
+  setVisible(visible: boolean): void {
     const becameVisible = visible && !this.visible;
     this.visible = Boolean(visible);
     if (!becameVisible) return;
@@ -148,7 +168,7 @@ export class Outline {
     this.scrollCurrentIntoView();
   }
 
-  highlight(id) {
+  highlight(id: string): void {
     if (id === this.currentId) return;
     if (this.currentId) this.buttons.get(this.currentId)?.classList.remove('is-current');
     this.currentId = id;
@@ -156,12 +176,12 @@ export class Outline {
     if (this.visible) this.scrollCurrentIntoView();
   }
 
-  scrollCurrentIntoView() {
+  scrollCurrentIntoView(): void {
     if (!this.currentId) return;
     this.buttons.get(this.currentId)?.scrollIntoView({ block: 'nearest' });
   }
 
-  clear() {
+  clear(): void {
     this.resizeObserver.disconnect();
     this.buttons.clear();
     this.targets = [];
@@ -172,6 +192,8 @@ export class Outline {
   }
 }
 
-function cssEscape(value) {
-  return window.CSS?.escape ? CSS.escape(value) : value.replace(/["\\]/g, '\\$&');
+// Chromium always provides CSS.escape; the old feature test was dead code —
+// `window.CSS?.escape` is truthy whenever CSS exists, so the fallback never ran.
+function cssEscape(value: string): string {
+  return CSS.escape(value);
 }

@@ -1,3 +1,5 @@
+import type { MermaidConfig } from 'mermaid';
+
 /**
  * Mermaid theme variables derived from the app palette.
  *
@@ -6,7 +8,21 @@
  * flowchart reads as part of the page rather than a screenshot pasted into it.
  */
 
-const LIGHT = {
+interface Palette {
+  bg: string;
+  surface: string;
+  surfaceAlt: string;
+  raised: string;
+  text: string;
+  textDim: string;
+  border: string;
+  borderSoft: string;
+  line: string;
+  accent: string;
+  series: string[];
+}
+
+const LIGHT: Palette = {
   bg: '#FAF9F5',
   surface: '#EFEDE4',
   surfaceAlt: '#F3F1EA',
@@ -21,7 +37,7 @@ const LIGHT = {
     '#5C7F86', '#8A6A4B', '#7C6E93', '#57734F', '#9C6B5A', '#4E6272'],
 };
 
-const DARK = {
+const DARK: Palette = {
   bg: '#1E1D1B',
   // Node fills sit a step lighter than the app's code background so shapes read
   // against the diagram card without turning into bright boxes.
@@ -44,9 +60,9 @@ const FONT_MONO =
   'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace';
 
 /** Build the full themeVariables object for one palette. */
-function variables(p) {
-  const series = {};
-  p.series.forEach((color, i) => {
+function variables(p: Palette): Record<string, unknown> {
+  const series: Record<string, string> = {};
+  p.series.forEach((color: string, i: number) => {
     series[`pie${i + 1}`] = color;
     series[`cScale${i}`] = color;
     series[`cScaleLabel${i}`] = p.bg;
@@ -232,8 +248,8 @@ function variables(p) {
 }
 
 /** Full mermaid config for a theme. */
-export function mermaidConfig(isDark) {
-  return {
+export function mermaidConfig(isDark: boolean): MermaidConfig {
+  const config: MermaidConfig = {
     startOnLoad: false,
     // Encodes HTML in labels and disables click bindings: a Markdown file is
     // untrusted input, and nothing in a reader needs diagram callbacks.
@@ -266,7 +282,13 @@ export function mermaidConfig(isDark) {
     packet: { useMaxWidth: false },
     architecture: { useMaxWidth: false, padding: 30 },
     radar: { useMaxWidth: false },
-    treemap: { useMaxWidth: false },
     kanban: { useMaxWidth: false },
   };
+
+  // treemap is a beta diagram: mermaid honours this key at runtime but has not
+  // declared it on MermaidConfig yet. Assigned through a cast so the exception
+  // is isolated here rather than casting the whole literal, which would switch
+  // off excess-property checking for every other key.
+  (config as Record<string, unknown>).treemap = { useMaxWidth: false };
+  return config;
 }

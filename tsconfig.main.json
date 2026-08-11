@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    // Node and Electron, no DOM. Main stays CommonJS JavaScript and is only
+    // type-checked, never compiled.
+    "module": "Node16",
+    "moduleResolution": "node16",
+    "lib": ["ES2023"],
+    "types": ["node"]
+  },
+  // scripts/ is deliberately out: build tooling where a type error shows up the
+  // moment you run it, and where esbuild/electron-builder option objects need
+  // heavy casting to satisfy their own typings for no safety gained.
+  "include": ["src/main/**/*", "src/types/**/*"]
+}

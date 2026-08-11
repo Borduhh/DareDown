@@ -9,33 +9,54 @@
 const HIT = 'find-hit';
 const ACTIVE = 'find-hit-active';
 
+interface FindUi {
+  bar: HTMLElement;
+  input: HTMLInputElement;
+  counter: HTMLElement;
+}
+
+/** A text node plus its absolute offset in the document's concatenated text. */
+interface TextSegment {
+  node: Text;
+  start: number;
+}
+
 export class Find {
+  private readonly host: HTMLElement;
+  private readonly docRoot: HTMLElement;
+  private readonly scroller: HTMLElement;
+  /**
+   * The three elements exist together or not at all — open() creates all of
+   * them, close() drops all of them. Grouping them makes that invariant part of
+   * the type, so one null check narrows all three instead of eleven assertions.
+   */
+  private ui: FindUi | null = null;
+  private ranges: Range[] = [];
+  private index = 0;
+  /** The CSS Custom Highlight API; without it find is disabled rather than faked. */
+  private readonly supported: boolean;
+
   /**
    * @param {HTMLElement} host element the bar is positioned within
    * @param {HTMLElement} docRoot searched subtree
    * @param {HTMLElement} scroller scroll container
    */
-  constructor(host, docRoot, scroller) {
+  constructor(host: HTMLElement, docRoot: HTMLElement, scroller: HTMLElement) {
     this.host = host;
     this.docRoot = docRoot;
     this.scroller = scroller;
-    this.bar = null;
-    this.input = null;
-    this.counter = null;
     /** @type {Range[]} */
-    this.ranges = [];
-    this.index = 0;
     this.supported = typeof Highlight === 'function' && Boolean(window.CSS?.highlights);
   }
 
   get isOpen() {
-    return this.bar !== null;
+    return this.ui !== null;
   }
 
-  open() {
-    if (this.bar) {
-      this.input.select();
-      this.input.focus();
+  open(): void {
+    if (this.ui) {
+      this.ui.input.select();
+      this.ui.input.focus();
       return;
     }
 
@@ -58,9 +79,7 @@ export class Find {
     bar.append(input, counter, previous, next, close);
     this.host.append(bar);
 
-    this.bar = bar;
-    this.input = input;
-    this.counter = counter;
+    this.ui = { bar, input, counter };
 
     input.addEventListener('input', () => this.search(input.value));
     input.addEventListener('keydown', (event) => {
@@ -86,43 +105,43 @@ export class Find {
     input.select();
   }
 
-  close() {
-    if (!this.bar) return;
+  close(): void {
+    const ui = this.ui;
+    if (!ui) return;
     this.clearHighlights();
-    this.bar.remove();
-    this.bar = null;
-    this.input = null;
-    this.counter = null;
+    ui.bar.remove();
     this.ranges = [];
     this.scroller.focus({ preventScroll: true });
   }
 
   /** Re-run the current query, e.g. after the document re-rendered. */
-  refresh() {
-    if (this.bar && this.input.value) this.search(this.input.value);
+  refresh(): void {
+    if (this.ui?.input.value) this.search(this.ui.input.value);
   }
 
-  search(query) {
+  search(query: string): void {
+    const ui = this.ui;
+    if (!ui) return;
     this.clearHighlights();
     this.ranges = [];
     this.index = 0;
 
     const needle = query.trim();
     if (!needle) {
-      this.counter.textContent = '';
-      this.counter.classList.remove('is-none');
+      ui.counter.textContent = '';
+      ui.counter.classList.remove('is-none');
       return;
     }
     if (!this.supported) {
-      this.counter.textContent = 'n/a';
+      ui.counter.textContent = 'n/a';
       return;
     }
 
     this.ranges = findRanges(this.docRoot, needle);
-    this.counter.classList.toggle('is-none', this.ranges.length === 0);
+    ui.counter.classList.toggle('is-none', this.ranges.length === 0);
 
     if (this.ranges.length === 0) {
-      this.counter.textContent = 'no results';
+      ui.counter.textContent = 'no results';
       return;
     }
     // Start from whatever is nearest the reader's current position.
@@ -131,14 +150,14 @@ export class Find {
     this.revealCurrent();
   }
 
-  step(offset) {
+  step(offset: number): void {
     if (this.ranges.length === 0) return;
     this.index = (this.index + offset + this.ranges.length) % this.ranges.length;
     this.paint();
     this.revealCurrent();
   }
 
-  nearestToViewport() {
+  nearestToViewport(): number {
     const top = this.scroller.scrollTop;
     let best = 0;
     let bestDistance = Infinity;
@@ -154,12 +173,14 @@ export class Find {
     return best;
   }
 
-  paint() {
+  paint(): void {
+    const ui = this.ui;
+    if (!ui) return;
     const others = this.ranges.filter((_, index) => index !== this.index);
     CSS.highlights.set(HIT, new Highlight(...others));
     const current = this.ranges[this.index];
     CSS.highlights.set(ACTIVE, new Highlight(...(current ? [current] : [])));
-    this.counter.textContent = `${this.index + 1} of ${this.ranges.length}`;
+    ui.counter.textContent = `${this.index + 1} of ${this.ranges.length}`;
   }
 
   revealCurrent() {
@@ -174,14 +195,14 @@ export class Find {
     }
   }
 
-  clearHighlights() {
+  clearHighlights(): void {
     if (!this.supported) return;
     CSS.highlights.delete(HIT);
     CSS.highlights.delete(ACTIVE);
   }
 }
 
-function smallButton(glyph, title) {
+function smallButton(glyph: string, title: string): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'mmd-btn';
@@ -196,7 +217,7 @@ function smallButton(glyph, title) {
  * Matches are found against the concatenated text of the subtree so a hit can
  * span element boundaries (e.g. a word interrupted by `<em>`).
  */
-function findRanges(root, needle) {
+function findRanges(root: HTMLElement, needle: string): Range[] {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       if (!node.nodeValue) return NodeFilter.FILTER_REJECT;
@@ -210,14 +231,14 @@ function findRanges(root, needle) {
     },
   });
 
-  /** @type {Array<{node: Text, start: number}>} */
-  const segments = [];
+  const segments: TextSegment[] = [];
   let haystack = '';
-  let node = walker.nextNode();
+  // SHOW_TEXT guarantees Text nodes; the DOM types still widen to Node.
+  let node = walker.nextNode() as Text | null;
   while (node) {
     segments.push({ node, start: haystack.length });
-    haystack += node.nodeValue;
-    node = walker.nextNode();
+    haystack += node.nodeValue ?? '';
+    node = walker.nextNode() as Text | null;
   }
 
   const lowerHay = haystack.toLowerCase();
@@ -237,7 +258,7 @@ function findRanges(root, needle) {
 }
 
 /** Map absolute offsets in the concatenated text back to a DOM Range. */
-function rangeFor(segments, start, end) {
+function rangeFor(segments: TextSegment[], start: number, end: number): Range | null {
   const startSegment = segmentAt(segments, start);
   const endSegment = segmentAt(segments, end - 1);
   if (!startSegment || !endSegment) return null;
@@ -253,13 +274,14 @@ function rangeFor(segments, start, end) {
 }
 
 /** Binary search for the text node containing an absolute offset. */
-function segmentAt(segments, offset) {
+function segmentAt(segments: TextSegment[], offset: number): TextSegment | null {
   let low = 0;
   let high = segments.length - 1;
   while (low <= high) {
     const mid = (low + high) >> 1;
     const segment = segments[mid];
-    const segmentEnd = segment.start + segment.node.nodeValue.length;
+    if (!segment) break;
+    const segmentEnd = segment.start + (segment.node.nodeValue?.length ?? 0);
     if (offset < segment.start) high = mid - 1;
     else if (offset >= segmentEnd) low = mid + 1;
     else return segment;
