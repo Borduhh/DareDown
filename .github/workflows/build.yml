@@ -1,0 +1,127 @@
+name: Build installers
+
+# Manual only. Two jobs this does that the release workflow cannot:
+#
+#  - verify packaging, signing and notarisation without cutting a version;
+#  - rebuild a ref whose release-time build failed. The release workflow builds
+#    from the tag it just created, so a fix landing after that tag can never be
+#    applied to it by re-running the job.
+#
+# Artifacts are attached to this run, never to a release.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag or SHA to build"
+        required: false
+        default: main
+      platforms:
+        description: "Which platforms to build"
+        required: false
+        default: all
+        type: choice
+        options: [all, macos, windows, linux]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            label: macOS
+            script: dist:mac
+            key: macos
+          - os: windows-latest
+            label: Windows
+            script: dist:win
+            key: windows
+          - os: ubuntu-latest
+            label: Linux
+            script: dist:linux
+            key: linux
+    steps:
+      - name: Skip unselected platforms
+        id: gate
+        shell: bash
+        run: |
+          if [ "${{ inputs.platforms }}" = "all" ] || [ "${{ inputs.platforms }}" = "${{ matrix.key }}" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Not selected." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/checkout@v5
+        if: steps.gate.outputs.run == 'true'
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/setup-node@v5
+        if: steps.gate.outputs.run == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+        if: steps.gate.outputs.run == 'true'
+
+      - name: Package
+        if: steps.gate.outputs.run == 'true'
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          script="${{ matrix.script }}"
+          if [ "${{ matrix.label }}" = "macOS" ]; then
+            if [ -n "${CSC_LINK:-}" ] && [ -n "${APPLE_ID:-}" ] && [ -n "${APPLE_TEAM_ID:-}" ]; then
+              script="dist:mac:signed"
+              echo "Signing with the Developer ID certificate and notarising." >> "$GITHUB_STEP_SUMMARY"
+            else
+              export CSC_IDENTITY_AUTO_DISCOVERY=false
+              echo "::warning::No macOS signing credentials — ad-hoc signed, un-notarised."
+            fi
+          fi
+          npm run "$script"
+
+      # Proves the notarisation ticket is actually stapled, rather than trusting
+      # that the submission step exited zero.
+      - name: Verify notarisation
+        if: steps.gate.outputs.run == 'true' && matrix.label == 'macOS'
+        shell: bash
+        run: |
+          app="release/mac-arm64/DareDown.app"
+          [ -d "$app" ] || app="release/mac/DareDown.app"
+          echo "### Gatekeeper" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          spctl -a -vvv "$app" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" || true
+          xcrun stapler validate "$app" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          if spctl -a "$app" 2>/dev/null; then
+            echo "Gatekeeper accepts the app — notarised and stapled." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Gatekeeper still rejects the app; see the output above."
+          fi
+
+      - name: Upload artifacts
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: daredown-${{ matrix.key }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            release/*.dmg
+            release/*.zip
+            release/*.exe
+            release/*.AppImage
+            release/*.deb
