@@ -36,23 +36,21 @@ Grab an installer from the [latest release](https://github.com/Borduhh/DareDown/
 | Windows | `DareDown.Setup.*.exe`, or `DareDown.*.exe` to run without installing |
 | Linux | `DareDown-*.AppImage`, or `daredown_*_amd64.deb` |
 
-### macOS blocks it on first launch
+### First launch
 
-DareDown is signed, but not **notarised** — that needs a paid Apple Developer
-account. So the first time you open it, macOS refuses and says it cannot verify
-the developer. To get past it, once:
+**macOS** builds are signed with a Developer ID certificate and notarised by
+Apple, so they open normally — drag to Applications and go. No Gatekeeper prompt,
+no Privacy & Security detour.
 
-1. Double-click DareDown and dismiss the warning. This step matters — the button
-   in the next step only appears after macOS has blocked a launch attempt.
-2. Open **System Settings → Privacy & Security**.
-3. Scroll to the Security section, find the message about DareDown being blocked,
-   and click **Open Anyway**.
-4. Confirm with Touch ID or your password.
+**Windows** builds are not code-signed, so SmartScreen will warn on first run.
+Choose **More info → Run anyway**. Signing here needs a separate certificate from
+a commercial CA, which DareDown does not have.
 
-It opens normally from then on. On macOS 15 and later the old
-right-click → Open shortcut no longer works for un-notarised apps; Privacy &
-Security is the way. Windows shows the equivalent SmartScreen prompt — choose
-**More info → Run anyway**.
+**Linux** AppImages may need the executable bit before they will run:
+
+```bash
+chmod +x DareDown-*.AppImage
+```
 
 ### From source
 
