@@ -3,6 +3,12 @@
 Every release on this page is derived from commit messages by semantic-release.
 Do not edit it by hand.
 
+## [1.5.0](https://github.com/Borduhh/DareDown/compare/v1.4.1...v1.5.0) (2026-08-11)
+
+### Features
+
+* show the running version in preferences and in Help ([5c06686](https://github.com/Borduhh/DareDown/commit/5c066863a1b01af2f4e5ed6b72522b3f792e7be1))
+
 ## [1.4.1](https://github.com/Borduhh/DareDown/compare/v1.4.0...v1.4.1) (2026-08-11)
 
 ### Bug Fixes
