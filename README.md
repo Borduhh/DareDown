@@ -33,7 +33,7 @@ Grab an installer from the [latest release](https://github.com/Borduhh/DareDown/
 |---|---|
 | macOS (Apple silicon) | `DareDown-*-arm64.dmg` |
 | macOS (Intel) | `DareDown-*.dmg` |
-| Windows | `DareDown.Setup.*.exe`, or `DareDown.*.exe` to run without installing |
+| Windows | `DareDown.Setup.*.exe` |
 | Linux | `DareDown-*.AppImage`, or `daredown_*_amd64.deb` |
 
 ### First launch

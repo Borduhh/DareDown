@@ -114,7 +114,7 @@ asar around 4 MB.
 
 ```bash
 npm run dist:mac      # dmg + zip, arm64 and x64
-npm run dist:win      # nsis installer + portable
+npm run dist:win      # nsis installer
 npm run dist:linux    # AppImage + deb
 npm run pack          # unpacked directory, for a quick check
 ```
@@ -190,6 +190,9 @@ are non-obvious:
 - **`app-update.yml` is only written for real targets.** `npm run pack` uses
   `--dir` and skips it, so an update check in a `pack` build will not work. Build
   a dmg or zip to test.
+- **There is no Windows portable target.** It was removed because a portable exe
+  has no installer to re-run, so it can never self-update — shipping it would
+  quietly create a population stuck on whatever version they first downloaded.
 - **macOS requires a signed, notarised build.** Squirrel.Mac verifies the
   incoming bundle against the running app's designated requirement, and an
   ad-hoc signature's requirement is pinned to its own cdhash — so no future
