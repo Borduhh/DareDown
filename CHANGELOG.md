@@ -3,6 +3,12 @@
 Every release on this page is derived from commit messages by semantic-release.
 Do not edit it by hand.
 
+## [1.3.0](https://github.com/Borduhh/DareDown/compare/v1.2.1...v1.3.0) (2026-08-11)
+
+### Features
+
+* cut 1.3.0 on the signed and notarised pipeline ([341ceca](https://github.com/Borduhh/DareDown/commit/341ceca2623c8e033e3f6dff82c0b1919c59b5f1))
+
 ## [1.2.1](https://github.com/Borduhh/DareDown/compare/v1.2.0...v1.2.1) (2026-08-11)
 
 ### Bug Fixes
