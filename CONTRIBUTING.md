@@ -80,12 +80,52 @@ npm run pack          # unpacked directory, for a quick check
 Output lands in `release/`. `.md` and friends are registered as openable document
 types on all three platforms.
 
-macOS builds are **ad-hoc signed, not notarised**. With no Developer ID on the
-machine, electron-builder skips signing entirely and leaves Electron's own
-signature on the renamed binary, which macOS rejects outright as damaged;
-`scripts/after-pack.mjs` re-signs ad-hoc so you get the ordinary
-unidentified-developer prompt instead. Set `CSC_LINK` and `CSC_KEY_PASSWORD` and
-it steps aside so a real identity is used.
+### Signing
+
+macOS builds are signed with a Developer ID certificate and notarised when the
+credentials are available, and fall back to ad-hoc signing when they are not.
+
+Locally, signing needs nothing but the certificate in your login keychain —
+`npm run pack` and `npm run dist:mac` pick it up automatically.
+`scripts/after-pack.mjs` only ad-hoc signs when no real identity is found, so it
+stands down on its own once a certificate is installed. That fallback matters:
+with no identity at all, electron-builder skips signing and leaves Electron's own
+signature on the renamed binary, which macOS rejects outright as *damaged* rather
+than merely unverified.
+
+Two gotchas worth knowing, both of which cost time the first time:
+
+- **The hardened runtime is required for notarisation**, and it forbids three
+  things Chromium needs. `build/entitlements.mac.plist` grants them as exceptions.
+  It deliberately does not include `com.apple.security.app-sandbox`.
+- **macOS does not ship the Developer ID G2 intermediate CA.** Xcode installs it;
+  a machine with only Command Line Tools does not have it, and signing fails with
+  `unable to build chain to self-signed root` even though the certificate and its
+  private key are both present and correctly paired. Fix:
+
+  ```bash
+  curl -fSLo /tmp/DeveloperIDG2CA.cer https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+  security import /tmp/DeveloperIDG2CA.cer -k ~/Library/Keychains/login.keychain-db
+  ```
+
+  `security find-identity -v -p codesigning` listing the certificate is the check
+  that matters — a certificate visible in Keychain Access is not the same thing.
+
+In CI the release workflow reads five secrets. If `MAC_CERT_P12`, `APPLE_ID` and
+`APPLE_TEAM_ID` are all present it runs `dist:mac:signed`, which notarises;
+otherwise it warns and produces an ad-hoc build, so a missing secret degrades
+rather than failing the release.
+
+| Secret | What it is |
+|---|---|
+| `MAC_CERT_P12` | base64 of the exported Developer ID `.p12` |
+| `MAC_CERT_PASSWORD` | the password set when exporting it |
+| `APPLE_ID` | the Apple ID that owns the developer account |
+| `APPLE_APP_SPECIFIC_PASSWORD` | from appleid.apple.com — **not** the account password |
+| `APPLE_TEAM_ID` | the ten-character team identifier |
+
+Notarisation is only exercised by `dist:mac:signed`; plain `npm run dist:mac` and
+`npm run pack` sign without notarising, so they work with no credentials.
 
 The app icon is a committed source asset at **`build/icon.png`** — a square PNG,
 1024×1024, from which electron-builder generates the macOS `.icns` and Windows

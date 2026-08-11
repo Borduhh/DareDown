@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Hardened runtime exceptions for Developer ID distribution.
+
+  Notarisation requires the hardened runtime, which by default forbids the three
+  things a Chromium-based app cannot do without. These are exceptions to that
+  policy, not sandbox permissions — DareDown is not sandboxed, so nothing here
+  grants file or network access it would otherwise lack.
+
+  Deliberately absent: com.apple.security.app-sandbox. That is a Mac App Store
+  requirement and would break opening arbitrary folders and restoring them at
+  launch, which needs security-scoped bookmarks rather than stored paths.
+-->
+<plist version="1.0">
+  <dict>
+    <!-- V8 compiles JavaScript to machine code at runtime. -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+
+    <!-- V8 also writes to pages it then executes, which JIT alone does not cover. -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+
+    <!--
+      The helper processes load Electron Framework from the bundle. Library
+      validation would require every loaded library to be signed by the same Team
+      ID, which the framework's own signature does not satisfy after repackaging.
+    -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+  </dict>
+</plist>

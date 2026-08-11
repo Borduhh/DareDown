@@ -95,11 +95,33 @@ jobs:
       - run: npm ci
 
       - name: Package
+        shell: bash
         env:
-          # Unsigned builds: without this, electron-builder hunts for a keychain
-          # identity and fails the job on macOS runners.
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-        run: npm run ${{ matrix.script }}
+          # Developer ID certificate as base64 of a .p12, plus its password.
+          CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          # Notarisation. An app-specific password, not the Apple ID password.
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          script="${{ matrix.script }}"
+          # Notarise only when the credentials are actually present. Without this
+          # guard a missing secret would fail the whole release rather than
+          # falling back, and macOS is the only platform with anything to sign.
+          if [ "${{ matrix.label }}" = "macOS" ]; then
+            if [ -n "${CSC_LINK:-}" ] && [ -n "${APPLE_ID:-}" ] && [ -n "${APPLE_TEAM_ID:-}" ]; then
+              script="dist:mac:signed"
+              echo "Signing with the Developer ID certificate and notarising." >> "$GITHUB_STEP_SUMMARY"
+            else
+              # electron-builder would otherwise search the (empty) runner
+              # keychain; after-pack.mjs ad-hoc signs so the build is still
+              # installable, just with the unidentified-developer prompt.
+              export CSC_IDENTITY_AUTO_DISCOVERY=false
+              echo "::warning::No macOS signing credentials — producing an ad-hoc signed, un-notarised build."
+            fi
+          fi
+          npm run "$script"
 
       - name: Attach installers to the release
         env:

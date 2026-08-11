@@ -40,6 +40,7 @@
     "pack": "npm run release:prep && electron-builder --dir --publish never",
     "dist": "npm run release:prep && electron-builder -mwl --publish never",
     "dist:mac": "npm run release:prep && electron-builder --mac --publish never",
+    "dist:mac:signed": "npm run release:prep && electron-builder --mac --publish never -c.mac.notarize=true",
     "dist:win": "npm run release:prep && electron-builder --win --publish never",
     "dist:linux": "npm run release:prep && electron-builder --linux --publish never",
     "release:prep": "node scripts/check-icon.mjs && npm run build",
@@ -119,7 +120,11 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "dmg": {
       "title": "DareDown ${version}"
