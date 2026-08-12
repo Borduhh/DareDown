@@ -3,6 +3,16 @@
 Every release on this page is derived from commit messages by semantic-release.
 Do not edit it by hand.
 
+## [1.6.0](https://github.com/Borduhh/DareDown/compare/v1.5.0...v1.6.0) (2026-08-12)
+
+### Features
+
+* **updates:** restart from the update notice, and make notices dismissible ([980f3da](https://github.com/Borduhh/DareDown/commit/980f3dafdb74cafb576d7237a5fec01c1194f296))
+
+### Bug Fixes
+
+* **updates:** retry transient network failures instead of surfacing them ([6707436](https://github.com/Borduhh/DareDown/commit/67074363b70b8ebe0b02b9912c95a05a66651840))
+
 ## [1.5.0](https://github.com/Borduhh/DareDown/compare/v1.4.1...v1.5.0) (2026-08-11)
 
 ### Features
