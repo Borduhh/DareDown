@@ -339,13 +339,72 @@ body[data-platform="darwin"] .topbar {
   pointer-events: none;
 }
 .toast {
-  padding: 7px 14px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: min(560px, calc(100vw - 40px));
+  padding: 6px 6px 6px 14px;
   border: var(--hairline) solid var(--border-strong);
   border-radius: 999px;
   background: var(--bg-raised);
   color: var(--text);
   font-size: 12.5px;
+  /* Sticky toasts stack, so they need to sit above the page rather than merge
+     into it — the only shadow outside the diagram modal, kept small. */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 12px -4px rgba(0, 0, 0, 0.12);
   animation: toast-in 180ms var(--ease);
+}
+.toast-message {
+  padding: 1px 0;
+}
+/* The affirmative action: the accent, so "Restart now" reads as the thing to do. */
+.toast-action {
+  flex: 0 0 auto;
+  margin-left: 4px;
+  padding: 4px 11px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: filter var(--dur) var(--ease);
+}
+[data-theme="dark"] .toast-action {
+  color: #201d19;
+}
+.toast-action:hover {
+  filter: brightness(1.08);
+}
+.toast-close {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+.toast-close:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.toast.error .toast-close {
+  color: var(--hue-red);
+  opacity: 0.75;
+}
+.toast.error .toast-close:hover {
+  opacity: 1;
 }
 .toast.error {
   border-color: var(--hue-red);

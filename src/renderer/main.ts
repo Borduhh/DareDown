@@ -863,12 +863,14 @@ el.btnSponsor.addEventListener('click', () => run('sponsor:open'));
 api.onUpdateStatus((status: UpdateStatus) => {
   switch (status.state) {
     case 'available':
-      toast(`Version ${status.version ?? ''} available — downloading`.trim());
+      toast(`Version ${status.version} is downloading`);
       break;
     case 'ready':
-      // Deliberately long: this one needs to survive being glanced at.
-      toast(`Version ${status.version ?? ''} is ready — restart to install`.trim(), {
-        duration: 12000,
+      // Sticky and actionable: the reader decides when to lose their place, so
+      // this waits rather than fading, and restarting is one click from here.
+      toast(`Version ${status.version} is ready to install`, {
+        persistent: true,
+        actions: [{ label: 'Restart now', onClick: () => void api.installUpdate() }],
       });
       break;
     case 'current':
@@ -878,7 +880,11 @@ api.onUpdateStatus((status: UpdateStatus) => {
       toast(status.message ?? 'Updates are unavailable in this build');
       break;
     case 'error':
-      toast(`Could not check for updates: ${status.message ?? 'unknown error'}`, { error: true });
+      // Stays put: an error that fades before it is read is worse than none.
+      toast(status.message ?? 'Could not check for updates', {
+        error: true,
+        persistent: true,
+      });
       break;
     default:
       // 'checking' and 'downloading' are noise once a check is under way.
