@@ -24,10 +24,71 @@ let publish = null;
 let wired = false;
 /** Guards against two checks overlapping and double-reporting. */
 let inFlight = false;
+/** Attempts still available for the check in flight; read by the error handler. */
+let retriesLeft = 0;
 
 /** @param {UpdateStatus} status */
 function report(status) {
   if (publish) publish(status);
+}
+
+/**
+ * Conditions where trying again is likely to succeed.
+ *
+ * The one that prompted this list is net::ERR_HTTP2_SERVER_REFUSED_STREAM:
+ * GitHub declines a stream *without processing it*, usually on a connection it
+ * is winding down, and RFC 7540 says that code is specifically safe to retry.
+ * electron-updater will not do it for us — its retryOnServerError covers only
+ * HTTP 5xx and EPIPE, and a Chromium net:: error is neither, so one momentary
+ * refusal became a hard failure.
+ */
+const TRANSIENT = [
+  'ERR_HTTP2_', // REFUSED_STREAM, PING_FAILED, PROTOCOL_ERROR
+  'ERR_CONNECTION_',
+  'ERR_NETWORK_CHANGED',
+  'ERR_TIMED_OUT',
+  'ERR_ABORTED',
+  'ERR_SOCKET_NOT_CONNECTED',
+  'ECONNRESET',
+  'ECONNABORTED',
+  'ETIMEDOUT',
+  'EPIPE',
+  'EAI_AGAIN',
+  'socket hang up',
+];
+
+/** @param {unknown} err */
+function errorText(err) {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/** @param {unknown} err */
+function isTransient(err) {
+  const text = errorText(err);
+  return TRANSIENT.some((code) => text.includes(code));
+}
+
+/**
+ * Turn a network failure into something a reader can act on. The raw code still
+ * goes to the console, where it is useful; ERR_HTTP2_SERVER_REFUSED_STREAM in a
+ * toast is not.
+ *
+ * @param {unknown} err
+ */
+function humanMessage(err) {
+  const text = errorText(err);
+  if (isTransient(err) || text.includes('ERR_NAME_NOT_RESOLVED') || text.includes('ENOTFOUND')) {
+    return 'Could not reach GitHub. Check your connection and try again.';
+  }
+  if (text.includes('404')) {
+    return 'No update information was published for this release.';
+  }
+  return text;
+}
+
+/** @param {number} ms */
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function updater() {
@@ -63,11 +124,13 @@ function wire() {
     report({ state: 'ready', version: info?.version });
   });
   au.on('error', (err) => {
+    // checkForUpdates() both emits this and rejects. While retries remain, stay
+    // quiet and let the loop in check() try again — otherwise the reader sees an
+    // error toast for a failure we are about to recover from.
+    console.warn('[updates]', errorText(err));
+    if (retriesLeft > 0 && isTransient(err)) return;
     inFlight = false;
-    report({
-      state: 'error',
-      message: err instanceof Error ? err.message : String(err),
-    });
+    report({ state: 'error', message: humanMessage(err) });
   });
 }
 
@@ -98,11 +161,24 @@ async function check() {
   if (inFlight) return;
   inFlight = true;
   wire();
-  try {
-    await updater().checkForUpdates();
-  } catch (err) {
-    inFlight = false;
-    report({ state: 'error', message: err instanceof Error ? err.message : String(err) });
+
+  const ATTEMPTS = 3;
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
+    retriesLeft = ATTEMPTS - attempt;
+    try {
+      await updater().checkForUpdates();
+      return;
+    } catch (err) {
+      if (retriesLeft > 0 && isTransient(err)) {
+        // Rising backoff, and a fresh connection next time, which is what
+        // actually clears a refused HTTP/2 stream.
+        await delay(attempt * 800);
+        continue;
+      }
+      inFlight = false;
+      report({ state: 'error', message: humanMessage(err) });
+      return;
+    }
   }
 }
 
@@ -112,4 +188,4 @@ function install() {
   updater().quitAndInstall();
 }
 
-module.exports = { configure, check, install };
+module.exports = { configure, check, install, isTransient, humanMessage };
