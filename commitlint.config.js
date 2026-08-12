@@ -31,6 +31,7 @@ module.exports = {
         'theme',
         'watcher',
         'config',
+        'updates',
         'packaging',
         'deps',
         'release',
