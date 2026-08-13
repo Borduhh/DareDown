@@ -3,6 +3,12 @@
 Every release on this page is derived from commit messages by semantic-release.
 Do not edit it by hand.
 
+## [1.7.2](https://github.com/Borduhh/DareDown/compare/v1.7.1...v1.7.2) (2026-08-13)
+
+### Bug Fixes
+
+* **outline:** stop a long outline from squashing every row to nothing ([1aa35bd](https://github.com/Borduhh/DareDown/commit/1aa35bd5270ef6db27140509ec40ff105d3e6f35))
+
 ## [1.7.1](https://github.com/Borduhh/DareDown/compare/v1.7.0...v1.7.1) (2026-08-13)
 
 ### Bug Fixes
