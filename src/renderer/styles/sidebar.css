@@ -354,9 +354,12 @@
  * ---------------------------------------------------------------------- */
 
 .outline-list {
-  display: flex;
-  flex-direction: column;
+  /* Block layout, deliberately. As a column flex container every row became a
+     flex item with flex-shrink: 1, so a document with more headings than fit
+     the rail had all of them squashed towards zero height rather than
+     scrolling — the outline looked shredded exactly when it was most needed. */
   flex: 1 1 auto;
+  min-height: 0;
   padding: 8px 6px 18px;
   overflow-y: auto;
   overflow-x: hidden;
