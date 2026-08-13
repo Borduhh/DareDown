@@ -756,7 +756,8 @@ const commands = {
   'theme:cycle': () => toggleTheme(),
   'update:check': () => {
     // Explicit request, so it runs whether or not the launch check is enabled.
-    showUpdateNotice('Checking for updates…');
+    checkNotice?.close(true);
+    checkNotice = toast('Checking for updates…');
     void api.checkForUpdates();
   },
   // Handed to the OS browser rather than fetched: the app itself still makes no
@@ -860,37 +861,42 @@ el.btnSponsor.addEventListener('click', () => run('sponsor:open'));
  * Update progress, surfaced as toasts rather than a panel: it is background
  * information, and the reader asked for a reader.
  *
- * One check is one notice. Since notices now wait to be dismissed, each step of
- * a check replaces the step before it — otherwise a single check would leave a
- * column of stale progress behind it.
+ * Results stack like any other notice — one does not quietly eat the last. The
+ * single exception is "Checking for updates…", which is progress rather than
+ * news: its whole purpose is to say the request was heard, so the outcome takes
+ * it out. It goes immediately rather than fading, because a fading card still
+ * holds its slot and the replacement would appear on top of it.
  */
-let updateNotice: ToastHandle | null = null;
+let checkNotice: ToastHandle | null = null;
 
-function showUpdateNotice(message: string, options?: Parameters<typeof toast>[1]): void {
-  updateNotice?.close();
-  updateNotice = toast(message, options);
+function clearCheckNotice(): void {
+  checkNotice?.close(true);
+  checkNotice = null;
 }
 
 api.onUpdateStatus((status: UpdateStatus) => {
+  // Anything below is an outcome, so the progress notice has served its purpose.
+  if (status.state !== 'checking' && status.state !== 'downloading') clearCheckNotice();
+
   switch (status.state) {
     case 'available':
-      showUpdateNotice(`Version ${status.version} is downloading`);
+      toast(`Version ${status.version} is downloading`);
       break;
     case 'ready':
       // The reader decides when to lose their place, so this waits — and
       // restarting is one click from where the news arrives.
-      showUpdateNotice(`Version ${status.version} is ready to install`, {
+      toast(`Version ${status.version} is ready to install`, {
         actions: [{ label: 'Restart now', onClick: () => void api.installUpdate() }],
       });
       break;
     case 'current':
-      showUpdateNotice('DareDown is up to date');
+      toast('DareDown is up to date');
       break;
     case 'unsupported':
-      showUpdateNotice(status.message ?? 'Updates are unavailable in this build');
+      toast(status.message ?? 'Updates are unavailable in this build');
       break;
     case 'error':
-      showUpdateNotice(status.message ?? 'Could not check for updates', { error: true });
+      toast(status.message ?? 'Could not check for updates', { error: true });
       break;
     default:
       // 'checking' and 'downloading' are noise once a check is under way.

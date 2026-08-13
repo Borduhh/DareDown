@@ -44,7 +44,12 @@ export interface ToastOptions {
 }
 
 export interface ToastHandle {
-  close(): void;
+  /**
+   * Dismiss the notice. Pass true to take it out of the DOM at once instead of
+   * fading it: a fading card still occupies its slot, so anything that replaces
+   * one in place has to remove it outright or the two visibly overlap.
+   */
+  close(immediate?: boolean): void;
 }
 
 interface Entry {
@@ -108,15 +113,20 @@ export function toast(
   let closed = false;
 
   const handle: ToastHandle = {
-    close() {
+    close(immediate = false) {
       if (closed) return;
       closed = true;
       const index = live.findIndex((entry) => entry.handle === handle);
       if (index !== -1) live.splice(index, 1);
-      element.style.pointerEvents = 'none';
-      element.style.opacity = '0';
-      element.style.transform = 'translateX(12px)';
-      setTimeout(() => element.remove(), 220);
+
+      if (immediate) {
+        element.remove();
+      } else {
+        element.style.pointerEvents = 'none';
+        element.style.opacity = '0';
+        element.style.transform = 'translateX(12px)';
+        setTimeout(() => element.remove(), 220);
+      }
       // Close the gap as it goes, rather than after it has faded.
       layout();
     },
