@@ -3,6 +3,12 @@
 Every release on this page is derived from commit messages by semantic-release.
 Do not edit it by hand.
 
+## [1.7.0](https://github.com/Borduhh/DareDown/compare/v1.6.0...v1.7.0) (2026-08-13)
+
+### Features
+
+* **renderer:** pile notifications in the corner and keep them until dismissed ([3209d43](https://github.com/Borduhh/DareDown/commit/3209d437aa1d315d087ce42333cd0dc5bf9c19aa))
+
 ## [1.6.0](https://github.com/Borduhh/DareDown/compare/v1.5.0...v1.6.0) (2026-08-12)
 
 ### Features
