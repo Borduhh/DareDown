@@ -3,6 +3,12 @@
 Every release on this page is derived from commit messages by semantic-release.
 Do not edit it by hand.
 
+## [1.7.1](https://github.com/Borduhh/DareDown/compare/v1.7.0...v1.7.1) (2026-08-13)
+
+### Bug Fixes
+
+* **updates:** stop one update notice from landing on top of the last ([6fe8f32](https://github.com/Borduhh/DareDown/commit/6fe8f32b7f19e1abbb2e4572f07df04a0567c899))
+
 ## [1.7.0](https://github.com/Borduhh/DareDown/compare/v1.6.0...v1.7.0) (2026-08-13)
 
 ### Features
