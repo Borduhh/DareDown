@@ -323,22 +323,28 @@ body[data-platform="darwin"] .topbar {
 }
 
 /* ---------------------------------------------------------------------- *
- * Toasts — brief, corner, non-blocking
+ * Toasts — a corner pile, non-blocking, dismissed by hand
  * ---------------------------------------------------------------------- */
 
+/* The cards overlap, so they are absolutely positioned and their depth offsets
+   are applied by toast.ts as the pile changes. */
 .toast-root {
   position: fixed;
+  right: 16px;
   bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  align-items: center;
   z-index: 60;
   pointer-events: none;
 }
 .toast {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  /* Cards behind shrink towards the pile rather than towards a corner. */
+  transform-origin: bottom center;
+  transition:
+    transform 220ms var(--ease),
+    width 220ms var(--ease),
+    opacity 180ms var(--ease);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -349,13 +355,20 @@ body[data-platform="darwin"] .topbar {
   background: var(--bg-raised);
   color: var(--text);
   font-size: 12.5px;
-  /* Sticky toasts stack, so they need to sit above the page rather than merge
-     into it — the only shadow outside the diagram modal, kept small. */
+  /* One line, always: a card that wraps throws the pile's geometry out and
+     reads badly next to its own button. Long messages are chopped instead. */
+  white-space: nowrap;
+  /* These pile up and stay, so they need to sit above the page and above each
+     other — the only shadow outside the diagram modal, kept small. */
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 12px -4px rgba(0, 0, 0, 0.12);
-  animation: toast-in 180ms var(--ease);
 }
 .toast-message {
+  /* Shrinks and ellipsises; the buttons beside it never do. */
+  flex: 0 1 auto;
+  min-width: 0;
   padding: 1px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 /* The affirmative action: the accent, so "Restart now" reads as the thing to do. */
 .toast-action {
@@ -409,19 +422,4 @@ body[data-platform="darwin"] .topbar {
 .toast.error {
   border-color: var(--hue-red);
   color: var(--hue-red);
-}
-.toast.leaving {
-  animation: toast-out 180ms var(--ease) forwards;
-}
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-}
-@keyframes toast-out {
-  to {
-    opacity: 0;
-    transform: translateY(4px);
-  }
 }

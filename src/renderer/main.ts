@@ -23,7 +23,7 @@ import { Tree } from './tree.js';
 import { Outline } from './outline.js';
 import { Find } from './find.js';
 import { openPreferences, openQuickOpen, openShortcuts } from './overlays.js';
-import { toast } from './toast.js';
+import { toast, type ToastHandle } from './toast.js';
 
 import type {
   Config,
@@ -756,7 +756,7 @@ const commands = {
   'theme:cycle': () => toggleTheme(),
   'update:check': () => {
     // Explicit request, so it runs whether or not the launch check is enabled.
-    toast('Checking for updates…');
+    showUpdateNotice('Checking for updates…');
     void api.checkForUpdates();
   },
   // Handed to the OS browser rather than fetched: the app itself still makes no
@@ -859,32 +859,38 @@ el.btnSponsor.addEventListener('click', () => run('sponsor:open'));
 /**
  * Update progress, surfaced as toasts rather than a panel: it is background
  * information, and the reader asked for a reader.
+ *
+ * One check is one notice. Since notices now wait to be dismissed, each step of
+ * a check replaces the step before it — otherwise a single check would leave a
+ * column of stale progress behind it.
  */
+let updateNotice: ToastHandle | null = null;
+
+function showUpdateNotice(message: string, options?: Parameters<typeof toast>[1]): void {
+  updateNotice?.close();
+  updateNotice = toast(message, options);
+}
+
 api.onUpdateStatus((status: UpdateStatus) => {
   switch (status.state) {
     case 'available':
-      toast(`Version ${status.version} is downloading`);
+      showUpdateNotice(`Version ${status.version} is downloading`);
       break;
     case 'ready':
-      // Sticky and actionable: the reader decides when to lose their place, so
-      // this waits rather than fading, and restarting is one click from here.
-      toast(`Version ${status.version} is ready to install`, {
-        persistent: true,
+      // The reader decides when to lose their place, so this waits — and
+      // restarting is one click from where the news arrives.
+      showUpdateNotice(`Version ${status.version} is ready to install`, {
         actions: [{ label: 'Restart now', onClick: () => void api.installUpdate() }],
       });
       break;
     case 'current':
-      toast('DareDown is up to date');
+      showUpdateNotice('DareDown is up to date');
       break;
     case 'unsupported':
-      toast(status.message ?? 'Updates are unavailable in this build');
+      showUpdateNotice(status.message ?? 'Updates are unavailable in this build');
       break;
     case 'error':
-      // Stays put: an error that fades before it is read is worse than none.
-      toast(status.message ?? 'Could not check for updates', {
-        error: true,
-        persistent: true,
-      });
+      showUpdateNotice(status.message ?? 'Could not check for updates', { error: true });
       break;
     default:
       // 'checking' and 'downloading' are noise once a check is under way.
@@ -1055,5 +1061,5 @@ async function boot() {
 
 boot().catch((err) => {
   console.error('[daredown] failed to start', err);
-  toast(`DareDown could not start: ${cleanMessage(err)}`, { error: true, duration: 8000 });
+  toast(`DareDown could not start: ${cleanMessage(err)}`, { error: true });
 });
