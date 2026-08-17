@@ -58,6 +58,12 @@ const api = {
   onMenuCommand: (/** @type {any} */ handler) => on('menu:command', handler),
   onOpenPaths: (/** @type {any} */ handler) => on('app:open-paths', handler),
 
+  // ---- diagram export --------------------------------------------------
+  beginDiagramExport: (/** @type {string} */ suggestedName) =>
+    ipcRenderer.invoke('diagram:export-begin', suggestedName),
+  finishDiagramExport: (/** @type {any} */ payload) =>
+    ipcRenderer.invoke('diagram:export-finish', payload),
+
   // ---- updates ---------------------------------------------------------
   checkForUpdates: () => ipcRenderer.invoke('update:check'),
   installUpdate: () => ipcRenderer.invoke('update:install'),

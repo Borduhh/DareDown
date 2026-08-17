@@ -10,6 +10,7 @@
  * cancelled outright (see installNetworkBlock).
  */
 const path = require('node:path');
+const { randomUUID } = require('node:crypto');
 const fsp = require('node:fs/promises');
 const {
   app,
@@ -319,6 +320,59 @@ function registerIpc() {
       properties: ['openDirectory'],
     });
     return result.canceled ? null : result.filePaths[0];
+  });
+
+  /**
+   * Diagram export, in two steps so the renderer never names a path.
+   *
+   * Main asks the reader where to save, keeps the answer here, and hands back a
+   * one-shot token. The renderer then supplies bytes for that token. This app's
+   * whole premise is that it only reads, so an IPC channel taking a path and
+   * some content would be the single largest thing ever handed to a document.
+   *
+   * @type {Map<string, { filePath: string, format: 'svg' | 'png' }>}
+   */
+  const pendingExports = new Map();
+
+  ipcMain.handle('diagram:export-begin', async (_event, suggestedName) => {
+    const stem =
+      String(suggestedName || '')
+        .replace(/[^\w.-]+/g, '-')
+        .replace(/^[-.]+|[-.]+$/g, '')
+        .slice(0, 60) || 'diagram';
+    const result = await dialog.showSaveDialog(requireWindow(), {
+      title: 'Export Diagram',
+      buttonLabel: 'Export',
+      defaultPath: path.join(app.getPath('downloads'), `${stem}.png`),
+      filters: [
+        { name: 'PNG Image', extensions: ['png'] },
+        { name: 'SVG Image', extensions: ['svg'] },
+      ],
+    });
+    if (result.canceled || !result.filePath) return null;
+
+    const format = path.extname(result.filePath).toLowerCase() === '.svg' ? 'svg' : 'png';
+    const token = randomUUID();
+    pendingExports.set(token, { filePath: result.filePath, format });
+    // A token the renderer never redeems must not stay redeemable.
+    setTimeout(() => pendingExports.delete(token), 60_000);
+    return { token, format };
+  });
+
+  ipcMain.handle('diagram:export-finish', async (_event, payload) => {
+    const token = typeof payload?.token === 'string' ? payload.token : '';
+    const target = pendingExports.get(token);
+    if (!target) return { ok: false, error: 'That export expired — try again.' };
+    pendingExports.delete(token);
+
+    try {
+      const bytes = Buffer.from(String(payload?.base64 ?? ''), 'base64');
+      if (bytes.length === 0) return { ok: false, error: 'Nothing to write.' };
+      await fsp.writeFile(target.filePath, bytes);
+      return { ok: true, name: path.basename(target.filePath) };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
   });
 
   ipcMain.handle('shell:open-external', (_event, url) => openExternal(url));

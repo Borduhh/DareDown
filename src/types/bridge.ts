@@ -130,6 +130,31 @@ export interface UpdateStatus {
   message?: string;
 }
 
+/* ------------------------------------------------------------------ *
+ * Diagram export
+ * ------------------------------------------------------------------ */
+
+export type DiagramFormat = 'svg' | 'png';
+
+/**
+ * Where an export is headed, as far as the renderer is allowed to know.
+ *
+ * Deliberately no path: the reader picks one in a native dialog owned by main,
+ * and the token stands in for it. The renderer says what to write, never where —
+ * a document reader has no business holding an arbitrary write.
+ */
+export interface DiagramExportTarget {
+  token: string;
+  format: DiagramFormat;
+}
+
+export interface DiagramExportResult {
+  ok: boolean;
+  /** Basename of what was written, for the confirmation message. */
+  name?: string;
+  error?: string;
+}
+
 /** Every `on*` member returns its own unsubscribe function. */
 export type Unsubscribe = () => void;
 
@@ -169,6 +194,16 @@ export interface DareDownApi {
   onNativeThemeChanged(handler: (isDark: boolean) => void): Unsubscribe;
   onMenuCommand(handler: (payload: MenuCommand) => void): Unsubscribe;
   onOpenPaths(handler: (paths: string[]) => void): Unsubscribe;
+
+  // ---- diagram export --------------------------------------------------
+  /**
+   * Ask where to save a diagram. Null when the reader cancels. The returned
+   * format is whichever extension they settled on, so the caller knows what to
+   * encode; pair it with finishDiagramExport and the same token.
+   */
+  beginDiagramExport(suggestedName: string): Promise<DiagramExportTarget | null>;
+  /** Hand over the encoded bytes for a token from beginDiagramExport. */
+  finishDiagramExport(payload: { token: string; base64: string }): Promise<DiagramExportResult>;
 
   // ---- updates ---------------------------------------------------------
   /** Ask GitHub for a newer release. Progress arrives via onUpdateStatus. */

@@ -14,6 +14,7 @@
  */
 import mermaid from 'mermaid';
 import { mermaidConfig } from './mermaid-theme.js';
+import type { DiagramFormat } from '../types/bridge.js';
 
 /** A diagram block, with the state we hang off it once rendered. */
 interface MermaidBlockElement extends HTMLElement {
@@ -107,6 +108,7 @@ const ICONS = {
   reset: '<path d="M3.4 8.2a6.8 6.8 0 1 1 1.2 5"/><polyline points="2.6,3.4 3.4,8.4 8.4,7.6"/>',
   expand: '<polyline points="7.4,2.8 2.8,2.8 2.8,7.4"/><polyline points="12.6,2.8 17.2,2.8 17.2,7.4"/><polyline points="17.2,12.6 17.2,17.2 12.6,17.2"/><polyline points="2.8,12.6 2.8,17.2 7.4,17.2"/>',
   close: '<line x1="4.6" y1="4.6" x2="15.4" y2="15.4"/><line x1="15.4" y1="4.6" x2="4.6" y2="15.4"/>',
+  download: '<line x1="10" y1="2.9" x2="10" y2="12.1"/><polyline points="6.3,8.5 10,12.2 13.7,8.5"/><path d="M3.6 14v1.6a1.5 1.5 0 0 0 1.5 1.5h9.8a1.5 1.5 0 0 0 1.5-1.5V14"/>',
 };
 
 function iconButton(
@@ -124,6 +126,106 @@ function iconButton(
   if (text) button.textContent = text;
   else button.innerHTML = `<svg viewBox="0 0 20 20" aria-hidden="true">${icon}</svg>`;
   return button;
+}
+
+
+/* ------------------------------------------------------------------ *
+ * Export
+ * ------------------------------------------------------------------ */
+
+/** Raster exports are drawn at twice the diagram's size so they survive a HiDPI screen. */
+const EXPORT_SCALE = 2;
+
+/**
+ * The diagram as a standalone SVG file.
+ *
+ * Mermaid keeps its generated CSS in a <style> inside the SVG, so a clone is
+ * already self-contained. What has to go is the inline sizing the zoom controls
+ * write: the export is the diagram at its natural size, not at whatever the
+ * reader happened to be zoomed to.
+ */
+function serializeDiagram(state: DiagramState): string {
+  const clone = state.svg.cloneNode(true) as SVGSVGElement;
+  clone.removeAttribute('style');
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+  clone.setAttribute('width', String(Math.round(state.natural.w)));
+  clone.setAttribute('height', String(Math.round(state.natural.h)));
+  if (!clone.getAttribute('viewBox')) {
+    clone.setAttribute('viewBox', `0 0 ${state.natural.w} ${state.natural.h}`);
+  }
+  return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(clone)}`;
+}
+
+/** Base64 of a UTF-8 string; btoa alone mangles anything outside Latin-1. */
+function toBase64(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+/** Draw the SVG through an <img> onto a canvas and take the PNG bytes. */
+async function rasterize(svgText: string, size: Size, background: string): Promise<string> {
+  const image = new Image();
+  const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgText)}`;
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error('the diagram could not be drawn to an image'));
+    image.src = url;
+  });
+
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(size.w * EXPORT_SCALE));
+  canvas.height = Math.max(1, Math.round(size.h * EXPORT_SCALE));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('no 2D canvas context');
+
+  // Paint the page colour first: a diagram drawn for the dark theme is nearly
+  // invisible on the transparency a PNG would otherwise keep.
+  ctx.fillStyle = background;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+  return canvas.toDataURL('image/png').split(',')[1] ?? '';
+}
+
+/**
+ * A save job handed out to whoever owns dialogs and IPC.
+ *
+ * This module knows how to turn a diagram into bytes and nothing else; where
+ * those bytes go, and what the reader is told about it, belongs to the shell.
+ * `encode` is called only once the format is settled, so a reader who wanted
+ * SVG never pays for a raster.
+ */
+export interface DiagramSaveJob {
+  suggestedName: string;
+  encode(format: DiagramFormat): Promise<string>;
+}
+
+export type DiagramSaver = (job: DiagramSaveJob) => Promise<void>;
+
+let saveDiagram: DiagramSaver | null = null;
+
+/** Wire up whoever handles saving; without one, the export buttons do nothing. */
+export function setDiagramSaver(saver: DiagramSaver): void {
+  saveDiagram = saver;
+}
+
+async function exportDiagram(state: DiagramState): Promise<void> {
+  if (!saveDiagram) return;
+  await saveDiagram({
+    suggestedName: state.label.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    encode: async (format) => {
+      const svgText = serializeDiagram(state);
+      if (format === 'svg') return toBase64(svgText);
+      return rasterize(
+        svgText,
+        state.natural,
+        getComputedStyle(document.body).backgroundColor || '#ffffff'
+      );
+    },
+  });
 }
 
 /* ------------------------------------------------------------------ *
@@ -303,8 +405,9 @@ function mount(
   const btnOut = iconButton(ICONS.zoomOut, 'Zoom out', 'out');
   const btnIn = iconButton(ICONS.zoomIn, 'Zoom in', 'in');
   const btnReset = iconButton(ICONS.reset, 'Reset zoom', 'reset');
+  const btnExport = iconButton(ICONS.download, 'Export as PNG or SVG', 'export');
   const btnFull = iconButton(ICONS.expand, 'Open fullscreen', 'full');
-  controls.append(btnOut, zoomLabel, btnIn, separator, btnReset, btnFull);
+  controls.append(btnOut, zoomLabel, btnIn, separator, btnReset, btnExport, btnFull);
 
   const foot = document.createElement('div');
   foot.className = 'mermaid-foot';
@@ -353,6 +456,7 @@ function mount(
     if (action === 'in') setInlineScale(state, state.scale * STEP);
     else if (action === 'out') setInlineScale(state, state.scale / STEP);
     else if (action === 'reset') setInlineScale(state, state.fitScale);
+    else if (action === 'export') void exportDiagram(state);
     else if (action === 'full') openFullscreen(state);
   });
 
@@ -482,11 +586,12 @@ function openFullscreen(state: DiagramState): void {
   const btnOut = iconButton(ICONS.zoomOut, 'Zoom out (−)', 'out');
   const btnIn = iconButton(ICONS.zoomIn, 'Zoom in (+)', 'in');
   const btnReset = iconButton(null, 'Reset view (0)', 'reset', { text: 'Reset' });
+  const btnExport = iconButton(ICONS.download, 'Export as PNG or SVG', 'export');
   const separator = document.createElement('span');
   separator.className = 'mmd-sep';
   const btnClose = iconButton(ICONS.close, 'Close (Esc)', 'close');
   btnClose.classList.add('mmd-close');
-  actions.append(btnOut, zoomLabel, btnIn, separator, btnReset, btnClose);
+  actions.append(btnOut, zoomLabel, btnIn, separator, btnReset, btnExport, btnClose);
   bar.append(title, actions);
 
   const stage = document.createElement('div');
@@ -667,6 +772,7 @@ function openFullscreen(state: DiagramState): void {
     if (action === 'in') zoomCentre(STEP);
     else if (action === 'out') zoomCentre(1 / STEP);
     else if (action === 'reset') reset();
+    else if (action === 'export') void exportDiagram(state);
     else if (action === 'close') close();
   });
 

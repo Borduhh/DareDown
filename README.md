@@ -83,10 +83,17 @@ fullscreen is separate, under View.)
 hover copy button. Raw HTML is allowed but sanitized.
 
 **Mermaid.** All standard diagram types render locally — no CDN, no network. Every
-diagram has hover-revealed controls (zoom out / level / zoom in / reset /
+diagram has hover-revealed controls (zoom out / level / zoom in / reset / export /
 fullscreen) and opens into a fullscreen modal with click-drag panning, cursor-anchored
 scroll and pinch zoom from 25% to 400%, a live zoom indicator, a reset button, and
-Esc-or-click-outside to close. Diagrams are themed to the app palette rather than
+Esc-or-click-outside to close.
+
+**Diagram export.** The export button on any diagram — inline or fullscreen — saves
+it as **PNG** or **SVG**, chosen by the extension in the save dialog. PNGs are written
+at twice the diagram's size with the current theme's page colour behind them, so a
+dark-theme diagram is not invisible on transparency. SVGs are self-contained: mermaid's
+styles travel inside the file and there are no external references. Either way you get
+the diagram at its natural size, whatever zoom you were reading it at. Diagrams are themed to the app palette rather than
 Mermaid's defaults, and a diagram that fails to parse degrades to an inline error
 card showing the message and its source — it never takes the page down.
 
@@ -172,7 +179,14 @@ how the icons are generated all live in [CONTRIBUTING.md](CONTRIBUTING.md).
 - Inline SVG and `<iframe>`/`<script>` in Markdown are stripped by the sanitizer.
   Mermaid is the supported route to diagrams.
 - No math rendering (KaTeX/MathJax would need to be bundled; not wired up).
-- No print or export.
+- No print or PDF output. Diagrams export as PNG/SVG; prose does not.
+- Exported SVGs carry their labels in `<foreignObject>` for about half the diagram
+  types (flowchart, class, state, ER, journey, requirements, mindmap, block,
+  kanban). Browsers render those; most vector editors — Illustrator, Figma,
+  Inkscape — ignore them, so the text goes missing there. Export PNG if the file
+  is headed for one of those. Sequence, gantt, pie, git graph, timeline, sankey,
+  XY, C4, packet, architecture, radar and treemap use plain SVG text and are
+  unaffected.
 - Mermaid is ~3 MB of the bundle. That is the price of rendering every diagram type
   offline, and it is the main reason `app.js` is as large as it is.
 

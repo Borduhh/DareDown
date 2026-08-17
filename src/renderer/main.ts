@@ -17,6 +17,7 @@ import {
   resetMermaidBlocks,
   closeMermaidModal,
   isMermaidModalOpen,
+  setDiagramSaver,
 } from './mermaid-view.js';
 import { Tabs } from './tabs.js';
 import { Tree } from './tree.js';
@@ -1016,6 +1017,29 @@ function isTypingTarget(target: EventTarget | null): boolean {
 /* ------------------------------------------------------------------ *
  * Boot
  * ------------------------------------------------------------------ */
+
+/**
+ * Saving a diagram: the view encodes it, main owns the dialog and the write.
+ * Main hands back only a token, never a path, so nothing here can name a file.
+ */
+setDiagramSaver(async ({ suggestedName, encode }) => {
+  let target;
+  try {
+    target = await api.beginDiagramExport(suggestedName);
+  } catch {
+    target = null;
+  }
+  if (!target) return;
+
+  try {
+    const base64 = await encode(target.format);
+    const result = await api.finishDiagramExport({ token: target.token, base64 });
+    if (result.ok) toast(`Saved ${result.name ?? 'the diagram'}`);
+    else toast(`Could not export the diagram: ${result.error ?? 'unknown error'}`, { error: true });
+  } catch (err) {
+    toast(`Could not export the diagram: ${cleanMessage(err)}`, { error: true });
+  }
+});
 
 async function boot() {
   document.body.dataset.platform = api.platform;

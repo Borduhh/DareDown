@@ -191,6 +191,17 @@
     installUpdate: async () => console.info('[harness] installUpdate'),
     onUpdateStatus: (h) => register('update-status', h),
 
+    // Nothing is written in a browser; the point is to exercise the encode path
+    // and report what would have gone to disk.
+    beginDiagramExport: async (name) => {
+      console.info('[harness] beginDiagramExport', name);
+      return { token: 'harness-token', format: 'png' };
+    },
+    finishDiagramExport: async ({ token, base64 }) => {
+      console.info('[harness] finishDiagramExport', token, `${base64.length} base64 chars`);
+      return { ok: true, name: 'diagram.png' };
+    },
+
     ready: async () => ({ platform: 'darwin', version: '0.0.0-harness' }),
   };
 
