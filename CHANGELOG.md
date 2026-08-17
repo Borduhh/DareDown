@@ -3,6 +3,12 @@
 Every release on this page is derived from commit messages by semantic-release.
 Do not edit it by hand.
 
+## [1.8.0](https://github.com/Borduhh/DareDown/compare/v1.7.2...v1.8.0) (2026-08-17)
+
+### Features
+
+* **mermaid:** export any diagram as PNG or SVG ([16214a3](https://github.com/Borduhh/DareDown/commit/16214a37b77f5bc37b5183e1dba63463d9ca9e7e))
+
 ## [1.7.2](https://github.com/Borduhh/DareDown/compare/v1.7.1...v1.7.2) (2026-08-13)
 
 ### Bug Fixes
