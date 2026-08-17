@@ -78,7 +78,8 @@
       {
         "successComment": false,
         "releasedLabels": false,
-        "addReleases": false
+        "addReleases": false,
+        "draftRelease": true
       }
     ]
   ]

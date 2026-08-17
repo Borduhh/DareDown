@@ -233,9 +233,17 @@ Pushing to `main` runs `.github/workflows/release.yml`, which:
    right there if nothing warrants a release;
 2. updates `CHANGELOG.md` and `package.json`, commits them as
    `chore(release): x.y.z [skip ci]`, and tags `vx.y.z`;
-3. creates the GitHub Release with generated notes;
+3. creates the GitHub Release with generated notes, **as a draft**;
 4. builds macOS, Windows and Linux installers from that tag in parallel and
-   uploads them to the release.
+   uploads them to the draft;
+5. publishes the draft, once every installer and every `latest*.yml` is attached.
+
+Step 5 is not decoration. A published release is visible to electron-updater the
+moment it exists, but its `latest*.yml` does not land until the builds finish —
+six minutes, measured on v1.8.0 — and an update check in that window fails with
+a 404. A draft is invisible to the updater, so a check during a build just
+reports no update, which is the truth. It also means a failed build leg leaves
+the release unpublished rather than public and missing a platform.
 
 Pushing to `next` publishes a prerelease (`1.2.0-next.1`) on the `next` dist-tag
 instead. To see what *would* happen without touching anything:

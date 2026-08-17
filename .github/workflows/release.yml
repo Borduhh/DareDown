@@ -137,4 +137,28 @@ jobs:
             exit 1
           fi
           printf 'Uploading %s\n' "${files[@]}"
+          # The release is still a draft here, which gh resolves by tag.
           gh release upload "v${{ needs.version.outputs.version }}" "${files[@]}" --clobber
+
+  publish:
+    name: Publish release
+    needs: [version, build]
+    if: needs.version.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # flip the draft to published
+    steps:
+      # semantic-release creates the release as a draft and the matrix above
+      # fills it. Only now, with every installer and every latest*.yml in place,
+      # does it become visible — a published release missing its metadata is one
+      # that answers an update check with a 404, and for the six minutes the
+      # builds took, that is exactly what readers got. A draft is invisible to
+      # electron-updater, so a check during a build simply reports no update.
+      #
+      # It also means a failed build leg leaves the release unpublished rather
+      # than public and missing a platform.
+      - name: Make the release visible
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release edit "v${{ needs.version.outputs.version }}" --draft=false --latest
