@@ -3,6 +3,12 @@
 Every release on this page is derived from commit messages by semantic-release.
 Do not edit it by hand.
 
+## [1.8.1](https://github.com/Borduhh/DareDown/compare/v1.8.0...v1.8.1) (2026-08-17)
+
+### Bug Fixes
+
+* **release:** keep a release unpublished until its installers exist ([54687ed](https://github.com/Borduhh/DareDown/commit/54687ed7caad10c06617faf7ba02771b61229487))
+
 ## [1.8.0](https://github.com/Borduhh/DareDown/compare/v1.7.2...v1.8.0) (2026-08-17)
 
 ### Features
