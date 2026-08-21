@@ -3,6 +3,12 @@
 Every release on this page is derived from commit messages by semantic-release.
 Do not edit it by hand.
 
+## [1.8.2](https://github.com/Borduhh/DareDown/compare/v1.8.1...v1.8.2) (2026-08-21)
+
+### Bug Fixes
+
+* **main:** bring the app to the front when a document is opened ([45af9a7](https://github.com/Borduhh/DareDown/commit/45af9a77c3f641e2d2a1dfd86dda8b8d02d0cadb))
+
 ## [1.8.1](https://github.com/Borduhh/DareDown/compare/v1.8.0...v1.8.1) (2026-08-17)
 
 ### Bug Fixes
