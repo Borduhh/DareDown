@@ -37,6 +37,8 @@ let win = null;
 /** @type {InstanceType<typeof Watcher> | null} */
 let watcher = null;
 let rendererReady = false;
+/** False until the first paint, so nothing surfaces a blank window. */
+let windowShown = false;
 /** Paths requested before the renderer finished booting. @type {string[]} */
 const pendingPaths = [];
 
@@ -51,10 +53,7 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on('second-instance', (_event, argv) => {
     queuePaths(collectPathArgs(argv));
-    if (win) {
-      if (win.isMinimized()) win.restore();
-      win.focus();
-    }
+    revealWindow();
   });
 }
 
@@ -114,7 +113,9 @@ function createWindow() {
   if (prefs.window.maximized) created.maximize();
 
   created.once('ready-to-show', () => {
+    windowShown = true;
     created.show();
+    activateApp();
   });
 
   created.on('close', () => {
@@ -125,6 +126,7 @@ function createWindow() {
   created.on('closed', () => {
     win = null;
     rendererReady = false;
+    windowShown = false;
   });
 
   const persist = debounce(persistWindowState, 350);
@@ -148,6 +150,36 @@ function createWindow() {
 
   created.loadFile(RENDERER_HTML);
   return created;
+}
+
+/**
+ * Pull the app in front of whatever the user was looking at.
+ *
+ * `show()` only reorders the window *within* the app, so an app that was
+ * launched or handed a document while another app was frontmost stays behind
+ * until it is activated explicitly. macOS needs `steal` because the request
+ * comes from Finder's activation, not ours.
+ */
+function activateApp() {
+  if (process.platform === 'darwin') app.focus({ steal: true });
+  else app.focus();
+}
+
+/**
+ * Surface the window for an "open this document" request: recreate it if it
+ * was closed, un-minimize it, unhide it, and bring the app forward.
+ */
+function revealWindow() {
+  // Before `ready` there is nothing to show; the first paint reveals itself.
+  if (!app.isReady()) return;
+  if (!win || win.isDestroyed()) {
+    createWindow();
+    return;
+  }
+  if (win.isMinimized()) win.restore();
+  if (windowShown) win.show();
+  win.focus();
+  activateApp();
 }
 
 /** The dialogs are only reachable from a menu, which requires a window. */
@@ -417,6 +449,7 @@ function registerIpc() {
 app.on('open-file', (event, filePath) => {
   event.preventDefault();
   queuePaths([filePath]);
+  revealWindow();
 });
 
 app.whenReady().then(() => {
@@ -458,7 +491,7 @@ app.whenReady().then(() => {
   queuePaths(collectPathArgs(process.argv));
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    revealWindow();
   });
 });
 
