@@ -3,6 +3,12 @@
 Every release on this page is derived from commit messages by semantic-release.
 Do not edit it by hand.
 
+## [1.9.0](https://github.com/Borduhh/DareDown/compare/v1.8.2...v1.9.0) (2026-10-12)
+
+### Features
+
+* **tabs:** close every open document at once ([6d09822](https://github.com/Borduhh/DareDown/commit/6d09822ca82f90eccdaf7aaa874089f5bf1dd1df))
+
 ## [1.8.2](https://github.com/Borduhh/DareDown/compare/v1.8.1...v1.8.2) (2026-08-21)
 
 ### Bug Fixes
