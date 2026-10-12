@@ -16,16 +16,19 @@ export interface TabsHandlers {
 }
 
 export class Tabs {
+  private readonly bar: HTMLElement;
   private readonly strip: HTMLElement;
   private readonly handlers: TabsHandlers;
   private readonly items = new Map<string, Tab>();
   activePath: string | null = null;
 
   /**
+   * @param {HTMLElement} bar the strip's container, hidden along with it
    * @param {HTMLElement} strip
    * @param {{ onActivate: (path: string) => void, onClose: (path: string) => void }} handlers
    */
-  constructor(strip: HTMLElement, handlers: TabsHandlers) {
+  constructor(bar: HTMLElement, strip: HTMLElement, handlers: TabsHandlers) {
+    this.bar = bar;
     this.strip = strip;
     this.handlers = handlers;
 
@@ -192,7 +195,7 @@ export class Tabs {
 
     this.strip.replaceChildren(fragment);
     // A single tab is noise — the breadcrumb in the title bar already names it.
-    this.strip.hidden = this.items.size < 2;
+    this.bar.hidden = this.items.size < 2;
   }
 
   scrollActiveIntoView() {

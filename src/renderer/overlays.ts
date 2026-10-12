@@ -515,6 +515,7 @@ export function openShortcuts({ isMac, onClose }: { isMac: boolean; onClose: () 
       [`${mod}R`, 'Reload document'],
       [`${mod}${alt}R`, 'Reveal in file manager'],
       [`${mod}W`, 'Close tab'],
+      [`${mod}${alt}W`, 'Close all tabs'],
     ]],
     ['Navigate', [
       [isMac ? `${mod}${alt}→` : 'Ctrl+Tab', 'Next tab'],

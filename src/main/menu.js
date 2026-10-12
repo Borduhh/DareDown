@@ -65,6 +65,7 @@ function buildMenu(handlers) {
       { label: 'Reveal in File Manager', accelerator: 'CmdOrCtrl+Alt+R', ...send('doc:reveal') },
       { type: 'separator' },
       { label: 'Close Tab', accelerator: 'CmdOrCtrl+W', ...send('tab:close') },
+      { label: 'Close All Tabs', accelerator: 'CmdOrCtrl+Alt+W', ...send('tab:closeAll') },
       { label: 'Close Folder', ...send('folder:close') },
       .../** @type {Electron.MenuItemConstructorOptions[]} */ (isMac
         ? []

@@ -136,7 +136,18 @@
         </aside>
 
         <main class="main" id="main">
-          <div class="tabstrip" id="tabstrip" role="tablist" hidden></div>
+          <!-- The strip scrolls; the close-all button stays pinned beside it. -->
+          <div class="tabbar" id="tabbar" hidden>
+            <div class="tabstrip" id="tabstrip" role="tablist"></div>
+            <button class="icon-btn sm tabbar-close-all" id="btn-close-all" type="button" title="Close all tabs (⌥⌘W)" aria-label="Close all tabs">
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <rect x="6.5" y="2.5" width="11" height="11" rx="2" />
+                <path d="M3.5 6.5v8a2 2 0 0 0 2 2h8" />
+                <line x1="9.8" y1="5.8" x2="14.2" y2="10.2" />
+                <line x1="14.2" y1="5.8" x2="9.8" y2="10.2" />
+              </svg>
+            </button>
+          </div>
           <div class="scroller" id="scroller" tabindex="-1">
             <article class="prose" id="doc" aria-live="polite"></article>
           </div>

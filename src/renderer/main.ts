@@ -62,6 +62,7 @@ const el = {
   sidebarGrip: must('#sidebar-grip'),
   tree: must('#tree'),
   main: must('#main'),
+  tabbar: must('#tabbar'),
   tabstrip: must('#tabstrip'),
   scroller: must('#scroller'),
   doc: must('#doc'),
@@ -73,6 +74,7 @@ const el = {
   btnPrefs: must<HTMLButtonElement>('#btn-prefs'),
   btnOpenFolder: must<HTMLButtonElement>('#btn-open-folder'),
   btnSponsor: must<HTMLButtonElement>('#btn-sponsor'),
+  btnCloseAll: must<HTMLButtonElement>('#btn-close-all'),
   welcomeFile: must<HTMLButtonElement>('#welcome-file'),
   welcomeFolder: must<HTMLButtonElement>('#welcome-folder'),
 };
@@ -245,7 +247,7 @@ function toggleTheme() {
  * Document rendering
  * ------------------------------------------------------------------ */
 
-const tabs = new Tabs(el.tabstrip, {
+const tabs = new Tabs(el.tabbar, el.tabstrip, {
   onActivate: (path) => activateTab(path),
   onClose: (path) => closeTab(path),
 });
@@ -515,6 +517,14 @@ function closeTab(path: string): void {
   syncWorkspace();
 }
 
+function closeAllTabs(): void {
+  if (tabs.count === 0) return;
+  tabs.closeAll();
+  state.stale.clear();
+  showWelcome();
+  syncWorkspace();
+}
+
 function showWelcome() {
   el.doc.replaceChildren();
   outline.clear();
@@ -741,6 +751,7 @@ const commands = {
   'tab:close': () => {
     if (tabs.activePath) closeTab(tabs.activePath);
   },
+  'tab:closeAll': () => closeAllTabs(),
   'tab:next': () => {
     const next = tabs.neighbour(1);
     if (next) activateTab(next);
@@ -857,6 +868,7 @@ el.sidebarTabs.addEventListener('click', (event: MouseEvent) => {
 el.btnPrefs.addEventListener('click', () => run('prefs:toggle'));
 el.btnOpenFolder.addEventListener('click', () => run('folder:open'));
 el.btnSponsor.addEventListener('click', () => run('sponsor:open'));
+el.btnCloseAll.addEventListener('click', () => run('tab:closeAll'));
 
 /**
  * Update progress, surfaced as toasts rather than a panel: it is background
